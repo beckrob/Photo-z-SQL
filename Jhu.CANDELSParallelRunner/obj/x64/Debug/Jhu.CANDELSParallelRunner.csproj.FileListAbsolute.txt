@@ -1,0 +1,17 @@
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.CANDELSParallelRunner.exe
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.CANDELSParallelRunner.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.HSCPhotoZ.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.PhotoZ.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.SqlServer.Array.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\TestMySpline.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.SpecSvc.Util.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.SqlServer.Array.Parser.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.HSCPhotoZ.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.PhotoZ.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.SqlServer.Array.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\TestMySpline.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.SpecSvc.Util.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\bin\x64\Debug\Jhu.SqlServer.Array.Parser.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\obj\x64\Debug\Jhu.CANDELSParallelRunner.csprojResolveAssemblyReference.cache
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\obj\x64\Debug\Jhu.CANDELSParallelRunner.exe
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.CANDELSParallelRunner\obj\x64\Debug\Jhu.CANDELSParallelRunner.pdb

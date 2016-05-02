@@ -1,0 +1,12 @@
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\Jhu.PhotoZSQL.dacpac
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\Jhu.PhotoZSQL.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\Jhu.PhotoZSQL.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\Jhu.PhotoZ.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\Jhu.SpecSvc.Util.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\TestMySpline.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\Jhu.PhotoZ.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\TestMySpline.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\bin\Release\Jhu.SpecSvc.Util.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\obj\x64\Release\Jhu.PhotoZSQL.sqlprojResolveAssemblyReference.cache
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\obj\x64\Release\Jhu.PhotoZSQL.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.PhotoZSQL\obj\x64\Release\Jhu.PhotoZSQL.pdb

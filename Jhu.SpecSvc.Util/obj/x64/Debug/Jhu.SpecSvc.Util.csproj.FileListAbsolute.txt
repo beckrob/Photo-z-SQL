@@ -1,0 +1,10 @@
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\bin\x64\Debug\Jhu.SpecSvc.Util.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\bin\x64\Debug\Jhu.SpecSvc.Util.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\obj\x64\Debug\Jhu.SpecSvc.Util.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\obj\x64\Debug\Jhu.SpecSvc.Util.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\obj\x64\Debug\Jhu.SpecSvc.Util.csprojResolveAssemblyReference.cache
+D:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\bin\x64\Debug\Jhu.SpecSvc.Util.dll
+D:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\bin\x64\Debug\Jhu.SpecSvc.Util.pdb
+D:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\obj\x64\Debug\Jhu.SpecSvc.Util.csprojResolveAssemblyReference.cache
+D:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\obj\x64\Debug\Jhu.SpecSvc.Util.dll
+D:\RBeck_Work\NextGenPhotoZ\spectrum\Jhu.SpecSvc.Util\obj\x64\Debug\Jhu.SpecSvc.Util.pdb

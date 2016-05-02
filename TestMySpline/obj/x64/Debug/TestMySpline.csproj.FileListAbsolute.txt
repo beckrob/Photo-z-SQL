@@ -1,0 +1,8 @@
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Debug\TestMySpline.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Debug\TestMySpline.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Debug\TestMySpline.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Debug\TestMySpline.pdb
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Debug\TestMySpline.dll
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Debug\TestMySpline.pdb
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Debug\TestMySpline.dll
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Debug\TestMySpline.pdb

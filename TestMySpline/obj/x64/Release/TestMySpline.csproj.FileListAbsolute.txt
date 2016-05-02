@@ -1,0 +1,10 @@
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Release\TestMySpline.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Release\TestMySpline.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Release\TestMySpline.dll
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Release\TestMySpline.pdb
+C:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Release\TestMySpline.csprojResolveAssemblyReference.cache
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Release\TestMySpline.dll
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\bin\x64\Release\TestMySpline.pdb
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Release\TestMySpline.dll
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Release\TestMySpline.pdb
+D:\RBeck_Work\NextGenPhotoZ\spectrum\TestMySpline\obj\x64\Release\TestMySpline.csprojResolveAssemblyReference.cache

@@ -10,22 +10,26 @@ namespace Jhu.PhotoZ
     public abstract class Template
     {
 
-        public Template(TemplateParameterAdditive aRedshift, TemplateParameterMultiplicative aLuminosity = null) : this()
+        public Template(TemplateParameter aRedshift, TemplateParameter aLuminosity = null) : this()
         {
             parameterList = new List<TemplateParameter>(5);
 
             if (!ReferenceEquals(aLuminosity, null))
             {
-                parameterList.Add(new TemplateParameterMultiplicative(aLuminosity) { Name = "Luminosity" });
+                parameterList.Add((TemplateParameter)aLuminosity.Clone());
+                parameterList.Last().Name = "Luminosity"; //Making sure the name of the parameter is correctly set
+                IgnoreLuminosity = false;
+                IterationStepsWhenIgnoringLuminosity = Constants.missingInt; 
             } 
             else 
             {
                 parameterList.Add(new TemplateParameterMultiplicative() { Name = "Luminosity", Value = 1.0 });
+                IgnoreLuminosity = true;
+                IterationStepsWhenIgnoringLuminosity = 21;
             }
-            parameterList.Add(new TemplateParameterAdditive(aRedshift) { Name = "Redshift" });
+            parameterList.Add((TemplateParameter)aRedshift.Clone());
+            parameterList.Last().Name = "Redshift"; //Making sure the name of the parameter is correctly set
 
-            IgnoreLuminosity = true;
-            IterationStepsWhenIgnoringLuminosity = 21;
 
             iterationStartID = Constants.missingInt;
             iterationLastID = Constants.missingInt;
@@ -261,10 +265,11 @@ namespace Jhu.PhotoZ
         public bool TryGetFluxFromCache(Filter aFilter, out double cachedFlux)
         {
             double[] fluxArray;
-            if (syntheticFluxCache.TryGetValue(aFilter, out fluxArray))
-            {
-                cachedFlux = Interlocked.CompareExchange(ref fluxArray[GetIndexInFluxCacheArray()], -1.0, -1.0);
+            int index = GetIndexInFluxCacheArray();
 
+            if (index != Constants.missingInt && syntheticFluxCache.TryGetValue(aFilter, out fluxArray))
+            {                    
+                cachedFlux = Interlocked.CompareExchange(ref fluxArray[index], -1.0, -1.0);
                 return cachedFlux != Constants.missingDouble;
             }
             else
@@ -277,10 +282,17 @@ namespace Jhu.PhotoZ
         public bool TryAddFluxToCache(Filter aFilter, double uncorrectedFlux)
         {
             double[] fluxArray;
+            int index = GetIndexInFluxCacheArray();
+
+            if (index == Constants.missingInt)
+            {
+                return false;
+            }
+
             if (syntheticFluxCache.TryGetValue(aFilter, out fluxArray))
             {
-                
-                Interlocked.CompareExchange(ref fluxArray[GetIndexInFluxCacheArray()], uncorrectedFlux, Constants.missingDouble);
+
+                Interlocked.CompareExchange(ref fluxArray[index], uncorrectedFlux, Constants.missingDouble);
 
                 return true;
             }
@@ -293,7 +305,7 @@ namespace Jhu.PhotoZ
                     fluxArray[i]=Constants.missingDouble;
                 }
 
-                fluxArray[GetIndexInFluxCacheArray()] = uncorrectedFlux;
+                fluxArray[index] = uncorrectedFlux;
 
                 return syntheticFluxCache.TryAdd(aFilter, fluxArray);
             }
@@ -311,18 +323,31 @@ namespace Jhu.PhotoZ
                 startingParam = 1;
             }
 
+            int paramIndex, paramBlockSize;
             for (int i = startingParam; i < parameterList.Count; ++i)
             {
                 if (i == 1 && redshiftCoverageSize != Constants.missingInt)
                 {
-                    index += redshiftIndexInCoverage * blockSize;
-                    blockSize *= redshiftCoverageSize;
+                    paramIndex = redshiftIndexInCoverage;
+                    paramBlockSize = redshiftCoverageSize;
                 }
                 else
                 {
-                    index += parameterList[i].GetParameterIndexInCoverage() * blockSize;
-                    blockSize *= parameterList[i].GetParameterCoverageSize();
+                    paramIndex = parameterList[i].GetParameterIndexInCoverage();
+                    paramBlockSize = parameterList[i].GetParameterCoverageSize();
                 }
+
+
+                if (paramIndex >= 0 && paramIndex < paramBlockSize)
+                {
+                    index += paramIndex * blockSize;
+                    blockSize *= paramBlockSize;                 
+                }
+                else
+                {
+                    return Constants.missingInt;
+                }
+
             }
 
             return index;

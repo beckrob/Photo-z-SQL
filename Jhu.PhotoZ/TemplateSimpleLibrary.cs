@@ -9,7 +9,7 @@ namespace Jhu.PhotoZ
     {
         private List<Spectrum> templateList;
 
-        public TemplateSimpleLibrary(List<Spectrum> aTemplates, TemplateParameterAdditive aRedshift, TemplateParameterMultiplicative aLuminosity = null)
+        public TemplateSimpleLibrary(List<Spectrum> aTemplates, TemplateParameter aRedshift, TemplateParameter aLuminosity = null)
             : base(aRedshift, aLuminosity)
         {
             if (!ReferenceEquals(aTemplates, null))

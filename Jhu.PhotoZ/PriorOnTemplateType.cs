@@ -8,38 +8,61 @@ namespace Jhu.PhotoZ
     public class PriorOnTemplateType : Prior
     {
         private int templateIDIndex;
-        private Dictionary<int, double> probabilityOfTemplateID;
+        private double[] probabilityOfTemplateID;
 
-        public PriorOnTemplateType(int[] templateIDs, double[] templateProbabilities, int templateIDParameterIndex=2)
+        public PriorOnTemplateType(double[] templateProbabilities, Template aTemp)
         {
-            probabilityOfTemplateID = new Dictionary<int, double>();
+            probabilityOfTemplateID = new double[templateProbabilities.Length];
 
-            for (int i = 0; i < templateIDs.Length; ++i)
+            for (int i = 0; i < templateProbabilities.Length; ++i)
             {
-                probabilityOfTemplateID[templateIDs[i]] = templateProbabilities[i];
+                probabilityOfTemplateID[i] = templateProbabilities[i];
             }
 
-            //This parameter will be set in VerifyParameterlist(), but can be set as default
-            templateIDIndex = templateIDParameterIndex;
+
+            bool found = false;
+            List<TemplateParameter> paramList = aTemp.GetParameterList();
+
+            for (int i = 0; i < paramList.Count; ++i)
+            {
+                if (paramList[i].Name == "TypeID" && paramList[i].GetParameterCoverageSize() == probabilityOfTemplateID.Length)
+                {
+                    templateIDIndex = i;
+
+                    found = true;
+                }
+            }
+
+            if (!found)
+            {
+                throw new ArgumentException("");
+            }
         }
 
         public override bool VerifyParameterlist(List<TemplateParameter> parameters)
         {
-            for (int i = 0; i < parameters.Count; ++i)
+            if (parameters.Count > templateIDIndex && parameters[templateIDIndex].Name == "TypeID" && parameters[templateIDIndex].GetParameterCoverageSize() == probabilityOfTemplateID.Length)
             {
-                if (parameters[i].Name == "TypeID")
-                {
-                    templateIDIndex = i;
-                    return true;
-                }
+                return true;
             }
-
-            return false;
+            else
+            {
+                return false;
+            }
         }
 
         public override double Evaluate(List<TemplateParameter> parameters)
         {
-            return probabilityOfTemplateID[ (int) Math.Round(parameters[templateIDIndex].Value) ];
+            int index = (int) Math.Round(parameters[templateIDIndex].Value);
+
+            if (index > 0 && index < probabilityOfTemplateID.Length)
+            {
+                return probabilityOfTemplateID[index];
+            }
+            else
+            {
+                return 0.0;
+            }
         }
 
         public override Prior CloneLightWeight()

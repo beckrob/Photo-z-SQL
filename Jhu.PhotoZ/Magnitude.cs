@@ -24,6 +24,11 @@ namespace Jhu.PhotoZ
             MagSystem = aMagnitude.MagSystem;
         }
 
+        public override Object Clone()
+        {
+            return new Magnitude(this);
+        }
+
         public override void SetupFromUncorrectedFlux(double uncorrectedFlux, double filterZeroPoint, bool filterZeroPointInFlux)
         {
 
@@ -31,7 +36,7 @@ namespace Jhu.PhotoZ
             Error = 0.0;
         }
 
-        public bool ApplySchlegelExtinctionCorrection(Filter filt, double mapValue, double rVParam)
+        public override bool ApplySchlegelExtinctionCorrection(Filter filt, double mapValue, double rVParam)
         {
             double mapFactor;
             if (filt.GetSchlegelMapFactor(rVParam, out mapFactor))
@@ -54,6 +59,17 @@ namespace Jhu.PhotoZ
             {
                 double flux = MagnitudeSystem.GetCGSFluxFromMagnitude(Value, MagSystem);
                 double fluxError = MagnitudeSystem.GetCGSFluxErrorFromMagnitudeAndError(Error, Value, MagSystem);
+
+                
+                if (flux <= 0.0 && aTargetMagSystem == MagnitudeSystem.Type.AB)
+                {
+                    //Negative fluxes in the SDSS system cannot be converted to an AB magnitude system
+                    //In this case, the approximation is made that the system is actually AB, with the flux zeropoint multiplier applied
+                    double zeropointMultiplier = MagnitudeSystem.GetSystemFluxZeroPoint(MagSystem) / MagnitudeSystem.GetSystemFluxZeroPoint(MagnitudeSystem.Type.AB);
+
+                    flux = MagnitudeSystem.GetCGSFluxFromMagnitude(Value, MagnitudeSystem.Type.AB) * zeropointMultiplier;
+                    fluxError = MagnitudeSystem.GetCGSFluxErrorFromMagnitudeAndError(Error, Value, MagnitudeSystem.Type.AB) * zeropointMultiplier;
+                }
 
                 Value = MagnitudeSystem.GetMagnitudeFromCGSFlux(flux, aTargetMagSystem);
                 Error = MagnitudeSystem.GetMagnitudeErrorFromCGSFluxAndError(fluxError, flux, aTargetMagSystem);

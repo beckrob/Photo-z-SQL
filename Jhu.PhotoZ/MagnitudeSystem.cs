@@ -9,15 +9,18 @@ namespace Jhu.PhotoZ
     {
         public enum Type { SDSS_u, SDSS_g, SDSS_r, SDSS_i, SDSS_z, AB };
 
+        private const double ABFluxZeroPoint = 3.631e-20;
+        //Applying -0.04 mag correction from SDSS to AB magnitude
+        //f_0=3767.04 Jy
+        private const double uSDSSFluxZeroPoint = 3.76704e-20;
+        //Applying +0.02 mag correction from SDSS to AB magnitude
+        //f_0=3564.51 Jy
+        private const double zSDSSFluxZeroPoint = 3.56451e-20;
+
+
         public static double GetMagnitudeFromCGSFlux(double aFluxInCGS, Type sys)
         { //Flux is expected to be in cgs
             double x;
-
-            if (aFluxInCGS == 0.0)
-            {
-                //TODO replace with something more reasonable than a lower bound, or make the lower bound configurable
-                return 36.0;
-            }
 
             switch (sys)
             {
@@ -26,30 +29,23 @@ namespace Jhu.PhotoZ
                     return -2.5 * Math.Log10(aFluxInCGS) - 48.6;
 
                 case Type.SDSS_u:
-                    //Applying -0.04 mag correction from SDSS to AB magnitude
-                    //f_0=3767.04 Jy
-                    x = 0.5 * aFluxInCGS / (3.76704e-20 * 1.4e-10);
+                    x = 0.5 * aFluxInCGS / (uSDSSFluxZeroPoint * 1.4e-10);
                     return -2.5 / Math.Log(10) * (Math.Log(x + Math.Sqrt(x * x + 1)) + Math.Log(1.4e-10));
 
                 case Type.SDSS_g:
-                    //f_0=3631 Jy
-                    x = 0.5 * aFluxInCGS / (3.631e-20 * 0.9e-10);
+                    x = 0.5 * aFluxInCGS / (ABFluxZeroPoint * 0.9e-10);
                     return -2.5 / Math.Log(10) * (Math.Log(x + Math.Sqrt(x * x + 1)) + Math.Log(0.9e-10));
 
                 case Type.SDSS_r:
-                    //f_0=3631 Jy
-                    x = 0.5 * aFluxInCGS / (3.631e-20 * 1.2e-10);
+                    x = 0.5 * aFluxInCGS / (ABFluxZeroPoint * 1.2e-10);
                     return -2.5 / Math.Log(10) * (Math.Log(x + Math.Sqrt(x * x + 1)) + Math.Log(1.2e-10));
 
                 case Type.SDSS_i:
-                    //f_0=3631 Jy
-                    x = 0.5 * aFluxInCGS / (3.631e-20 * 1.8e-10);
+                    x = 0.5 * aFluxInCGS / (ABFluxZeroPoint * 1.8e-10);
                     return -2.5 / Math.Log(10) * (Math.Log(x + Math.Sqrt(x * x + 1)) + Math.Log(1.8e-10));
 
                 case Type.SDSS_z:
-                    //Applying +0.02 mag correction from SDSS to AB magnitude
-                    //f_0=3564.51 Jy
-                    x = 0.5 * aFluxInCGS / (3.56451e-20 * 7.4e-10);
+                    x = 0.5 * aFluxInCGS / (zSDSSFluxZeroPoint * 7.4e-10);
                     return -2.5 / Math.Log(10) * (Math.Log(x + Math.Sqrt(x * x + 1)) + Math.Log(7.4e-10));
 
 
@@ -62,12 +58,6 @@ namespace Jhu.PhotoZ
         { //Flux is expected to be in cgs
             double x;
 
-            if (aFluxInCGS == 0.0)
-            {
-                //TODO replace with something more reasonable
-                return 3.0;
-            }
-
             switch (sys)
             {
 
@@ -75,31 +65,51 @@ namespace Jhu.PhotoZ
                     return Math.Abs(-2.5 / Math.Log(10) / aFluxInCGS * aFluxErrorInCGS);
 
                 case Type.SDSS_u:
-                    //Applying -0.04 mag correction from SDSS to AB magnitude
-                    //f_0=3767.04 Jy
-                    x = 0.5 * aFluxInCGS / (3.76704e-20 * 1.4e-10);
-                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / 3.76704e-20 / 1.4e-10 * aFluxErrorInCGS);
+                    x = 0.5 * aFluxInCGS / (uSDSSFluxZeroPoint * 1.4e-10);
+                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / uSDSSFluxZeroPoint / 1.4e-10 * aFluxErrorInCGS);
 
                 case Type.SDSS_g:
-                    //f_0=3631 Jy
-                    x = 0.5 * aFluxInCGS / (3.631e-20 * 0.9e-10);
-                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / 3.631e-20 / 0.9e-10 * aFluxErrorInCGS);
+                    x = 0.5 * aFluxInCGS / (ABFluxZeroPoint * 0.9e-10);
+                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / ABFluxZeroPoint / 0.9e-10 * aFluxErrorInCGS);
 
                 case Type.SDSS_r:
-                    //f_0=3631 Jy
-                    x = 0.5 * aFluxInCGS / (3.631e-20 * 1.2e-10);
-                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / 3.631e-20 / 1.2e-10 * aFluxErrorInCGS);
+                    x = 0.5 * aFluxInCGS / (ABFluxZeroPoint * 1.2e-10);
+                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / ABFluxZeroPoint / 1.2e-10 * aFluxErrorInCGS);
 
                 case Type.SDSS_i:
-                    //f_0=3631 Jy
-                    x = 0.5 * aFluxInCGS / (3.631e-20 * 1.8e-10);
-                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / 3.631e-20 / 1.8e-10 * aFluxErrorInCGS);
+                    x = 0.5 * aFluxInCGS / (ABFluxZeroPoint * 1.8e-10);
+                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / ABFluxZeroPoint / 1.8e-10 * aFluxErrorInCGS);
 
                 case Type.SDSS_z:
-                    //Applying +0.02 mag correction from SDSS to AB magnitude
-                    //f_0=3564.51 Jy
-                    x = 0.5 * aFluxInCGS / (3.56451e-20 * 7.4e-10);
-                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / 3.56451e-20 / 7.4e-10 * aFluxErrorInCGS);
+                    x = 0.5 * aFluxInCGS / (zSDSSFluxZeroPoint * 7.4e-10);
+                    return Math.Abs(-2.5 / Math.Log(10) / Math.Sqrt(x * x + 1) * 0.5 / zSDSSFluxZeroPoint / 7.4e-10 * aFluxErrorInCGS);
+
+                default:
+                    return Constants.missingDouble;
+            }
+        }
+
+        public static double GetSystemFluxZeroPoint(Type sys)
+        {
+            switch (sys)
+            {
+                case Type.AB:
+                    return ABFluxZeroPoint;
+
+                case Type.SDSS_u:
+                    return uSDSSFluxZeroPoint;
+
+                case Type.SDSS_g:
+                    return ABFluxZeroPoint;
+
+                case Type.SDSS_r:
+                    return ABFluxZeroPoint;
+
+                case Type.SDSS_i:
+                    return ABFluxZeroPoint;
+
+                case Type.SDSS_z:
+                    return zSDSSFluxZeroPoint;
 
                 default:
                     return Constants.missingDouble;
@@ -115,26 +125,19 @@ namespace Jhu.PhotoZ
                     return Math.Pow(10, (mag + 48.6) / (-2.5));
 
                 case Type.SDSS_u:
-                    //Applying -0.04 mag correction from SDSS to AB magnitude
-                    //f_0=3767.04 Jy
-                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(1.4e-10)) * 2.0 * 1.4e-10 * 3.76704e-20;
+                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(1.4e-10)) * 2.0 * 1.4e-10 * uSDSSFluxZeroPoint;
 
                 case Type.SDSS_g:
-                    //f_0=3631 Jy
-                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(0.9e-10)) * 2.0 * 0.9e-10 * 3.631e-20;
+                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(0.9e-10)) * 2.0 * 0.9e-10 * ABFluxZeroPoint;
 
                 case Type.SDSS_r:
-                    //f_0=3631 Jy
-                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(1.2e-10)) * 2.0 * 1.2e-10 * 3.631e-20;
+                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(1.2e-10)) * 2.0 * 1.2e-10 * ABFluxZeroPoint;
 
                 case Type.SDSS_i:
-                    //f_0=3631 Jy
-                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(1.8e-10)) * 2.0 * 1.8e-10 * 3.631e-20;
+                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(1.8e-10)) * 2.0 * 1.8e-10 * ABFluxZeroPoint;
 
                 case Type.SDSS_z:
-                    //Applying +0.02 mag correction from SDSS to AB magnitude
-                    //f_0=3564.51 Jy
-                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(7.4e-10)) * 2.0 * 7.4e-10 * 3.56451e-20;
+                    return Math.Sinh(mag * Math.Log(10) / (-2.5) - Math.Log(7.4e-10)) * 2.0 * 7.4e-10 * zSDSSFluxZeroPoint;
 
 
                 default:
@@ -150,26 +153,19 @@ namespace Jhu.PhotoZ
                     return Math.Abs(Math.Log(10) / (-2.5) * Math.Pow(10, (mag + 48.6) / (-2.5)) * magError);
 
                 case Type.SDSS_u:
-                    //Applying -0.04 mag correction from SDSS to AB magnitude
-                    //f_0=3767.04 Jy
-                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(1.4e-10)) * 2.0 * 1.4e-10 * 3.76704e-20 * magError);
+                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(1.4e-10)) * 2.0 * 1.4e-10 * uSDSSFluxZeroPoint * magError);
 
                 case Type.SDSS_g:
-                    //f_0=3631 Jy
-                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(0.9e-10)) * 2.0 * 0.9e-10 * 3.631e-20 * magError);
+                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(0.9e-10)) * 2.0 * 0.9e-10 * ABFluxZeroPoint * magError);
 
                 case Type.SDSS_r:
-                    //f_0=3631 Jy
-                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(1.2e-10)) * 2.0 * 1.2e-10 * 3.631e-20 * magError);
+                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(1.2e-10)) * 2.0 * 1.2e-10 * ABFluxZeroPoint * magError);
 
                 case Type.SDSS_i:
-                    //f_0=3631 Jy
-                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(1.8e-10)) * 2.0 * 1.8e-10 * 3.631e-20 * magError);
+                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(1.8e-10)) * 2.0 * 1.8e-10 * ABFluxZeroPoint * magError);
 
                 case Type.SDSS_z:
-                    //Applying +0.02 mag correction from SDSS to AB magnitude
-                    //f_0=3564.51 Jy
-                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(7.4e-10)) * 2.0 * 7.4e-10 * 3.56451e-20 * magError);
+                    return Math.Abs(Math.Log(10) / (-2.5) * Math.Cosh(mag * Math.Log(10) / (-2.5) - Math.Log(7.4e-10)) * 2.0 * 7.4e-10 * zSDSSFluxZeroPoint * magError);
 
 
                 default:

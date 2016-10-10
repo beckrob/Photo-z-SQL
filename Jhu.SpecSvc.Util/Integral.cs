@@ -531,7 +531,18 @@ namespace Jhu.SpecSvc.Util
                 {
                     fp++;
                     if (fp == fx.Length)
-                        return flux / filt;
+                    {
+                        if (flux == 0.0 && filt == 0.0)
+                        {
+                            error = true;
+                            return double.NaN;
+                        }
+                        else
+                        {
+                            return flux / filt;
+                        }   
+                    }
+                        
                 }
 
                 if (fpa == -1)
@@ -561,7 +572,16 @@ namespace Jhu.SpecSvc.Util
                 sp++;
             }
 
-            return flux / filt;
+
+            if (flux == 0.0 && filt == 0.0)
+            {
+                error = true;
+                return double.NaN;
+            }
+            else
+            {
+                return flux / filt;
+            }
 
         }
 

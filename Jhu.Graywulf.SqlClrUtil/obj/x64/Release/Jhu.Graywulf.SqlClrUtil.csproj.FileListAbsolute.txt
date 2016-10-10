@@ -1,0 +1,5 @@
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\bin\x64\Release\gwsqlclrutil.exe.config
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\bin\x64\Release\gwsqlclrutil.exe
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\bin\x64\Release\gwsqlclrutil.pdb
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\obj\x64\Release\gwsqlclrutil.exe
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\obj\x64\Release\gwsqlclrutil.pdb

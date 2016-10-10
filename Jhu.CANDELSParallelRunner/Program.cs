@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.IO;
@@ -9,6 +8,8 @@ using System.Threading.Tasks;
 using Jhu.PhotoZ;
 using Jhu.HSCPhotoZ;
 
+using MathNet.Numerics.LinearAlgebra;
+
 namespace Jhu.CANDELSParallelRunner
 {
     class Program
@@ -16,6 +17,9 @@ namespace Jhu.CANDELSParallelRunner
 
         private const string aConnectionStringTemplates = @"data source=future1;initial catalog=beckrob23;multipleactiveresultsets=true;Integrated Security=true";
 
+        private const int numFiltersToUse = 10;
+
+        private const bool fitInFluxSpace = true;
 
         private static readonly string[] aFilterPaths = new string[14] 
         {
@@ -54,8 +58,8 @@ namespace Jhu.CANDELSParallelRunner
 
         static void Main(string[] args)
         {
-            //First argument: path to file containing the training set objects, in txt format
-            //Second argument: path to file containing the control set objects, in txt format
+            //First argument: path to file containing the query objects, in CSV format
+            //Second argument: path to file containing the training objects, in CSV format (used when calibrating)
             //Third argument: tag of spectrum and probability distribution files
             //Fourth argument: integer code of photometry setup to use
             //  0 - BPZ templates with flat prior
@@ -64,14 +68,24 @@ namespace Jhu.CANDELSParallelRunner
             //  3 - LePhare templates with absolute magnitude prior
             //  4 - LePhare templates with adapted BPZ prior
             //Fifth argument: integer code of whether to do zero-point calibration (0 no, 1 yes, 2 yes, and also apply filter error calibration)
-            //                  0 or 1 will mean an extra 0.01 magnitude error is added, 2 means the calibrated magnitude error is added
+            //Sixth argument: amount of extra magnitude error to add
+            //Seventh argument: whether to use identity correlation matrix (for testing, 0 no, everything else yes)
 
             //The output will be on the standard output
 
             int photoSetup;
             int doCalibration;
-            if (args.Length == 5 && int.TryParse(args[3], out photoSetup) && int.TryParse(args[4], out doCalibration))
+            double errorSoftening;
+            int corrMatUse;
+            if (args.Length >= 6 && 
+                int.TryParse(args[3], out photoSetup) && 
+                int.TryParse(args[4], out doCalibration) && 
+                double.TryParse(args[5], out errorSoftening))
             {
+                if (args.Length < 7 || !(int.TryParse(args[6], out corrMatUse)))
+                {
+                    corrMatUse = 0;
+                }
 
                 HSCTemplateExtractorDB templateExtractor = new HSCTemplateExtractorDB(aConnectionStringTemplates);
 
@@ -83,7 +97,7 @@ namespace Jhu.CANDELSParallelRunner
                     for (int i = 0; i < 71; ++i)
                     {
                         bool error;
-                        Spectrum template = templateExtractor.ExtractTemplateFromDB(i, 0, out error);
+                        Spectrum template = templateExtractor.ExtractTemplateFromDB(i, 0, out error, true);
                         if (!error)
                         {
                             templates.Add(template);
@@ -97,7 +111,7 @@ namespace Jhu.CANDELSParallelRunner
                     for (int i = 0; i < 641; ++i)
                     {
                         bool error;
-                        Spectrum template = templateExtractor.ExtractTemplateFromDB(i, 2, out error);
+                        Spectrum template = templateExtractor.ExtractTemplateFromDB(i, 2, out error, true);
                         if (!error)
                         {
                             templates.Add(template);
@@ -105,18 +119,8 @@ namespace Jhu.CANDELSParallelRunner
                     }
                 }
 
-                double errorSoftening;
-                bool applyFilterErrorCorrection;
-                if (doCalibration == 2)
-                {
-                    errorSoftening = 0.0;
-                    applyFilterErrorCorrection = true;
-                }
-                else
-                {
-                    errorSoftening = 0.01;
-                    applyFilterErrorCorrection = false;
-                }
+                bool applyFilterErrorCorrection = (doCalibration == 2);
+                bool useIdentityCorrelationMatrix = !(corrMatUse == 0);
 
                 TemplateSimpleLibrary templateLib = new TemplateSimpleLibrary(templates, new TemplateParameterAdditive(1e-3, 6.001, 0.01))
                 {
@@ -124,11 +128,15 @@ namespace Jhu.CANDELSParallelRunner
                     IterationStepsWhenIgnoringLuminosity = 11
                 };
 
-                List<Filter> filterList = new List<Filter>(14);
-                for (int i = 0; i < 14; ++i)
+                string globalFilePath = (args[0].LastIndexOf('/') < args[0].LastIndexOf('\\'))
+                                            ? args[0].Remove(args[0].LastIndexOf('\\')) + "\\"
+                                            : args[0].Remove(args[0].LastIndexOf('/')) + "/";
+
+                List<Filter> filterList = new List<Filter>(numFiltersToUse);
+                for (int i = 0; i < numFiltersToUse; ++i)
                 {
 
-                    Filter tmpFilter = new Filter(aFilterPaths[i]);
+                    Filter tmpFilter = new Filter(globalFilePath+aFilterPaths[i]);
 
                     tmpFilter.EffectiveWavelength = aFilterEffWavelengths[i];
                     tmpFilter.SetReferenceSpectrumForExtinctionCorrection(templates[0]);
@@ -139,8 +147,8 @@ namespace Jhu.CANDELSParallelRunner
                 }
 
 
-                List<Magnitude> magnitudeList = new List<Magnitude>(14);
-                for (int i = 0; i < 14; ++i)
+                List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeList = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(numFiltersToUse);
+                for (int i = 0; i < numFiltersToUse; ++i)
                 {
                     magnitudeList.Add(new Magnitude() { Value = 21.0, Error = 0.2, MagSystem = MagnitudeSystem.Type.AB });
                 }
@@ -148,11 +156,11 @@ namespace Jhu.CANDELSParallelRunner
 
                 //Populating syntheticFluxCache with cached synthetic magnitude results
                 //Calls from the same filter set will not populate
-                bool dummyFitError;
+                int dummyFitError;
                 TemplateFit.GetBestChiSquareFit(templateLib,
                                                 filterList,
                                                 magnitudeList,
-                                                true,
+                                                fitInFluxSpace,
                                                 0.0,
                                                 false,
                                                 out dummyFitError);
@@ -167,117 +175,6 @@ namespace Jhu.CANDELSParallelRunner
                                                 17913.0,22934.0,46470.0,17546.0,2469.0,301.0,
                                                 2862.0,7073.0,4436.0,1948.0};
                 Prior priorInfo = new PriorOnTemplateType(Enumerable.Range(0, 38).ToArray(), typeProbabilites);*/
-
-                int galaxyCount = 0;
-                int taskCount = 0;
-
-                List<List<Magnitude>> calibrationMagnitudeLists = new List<List<Magnitude>>();
-                List<List<Filter>> calibrationFilterLists = new List<List<Filter>>();
-                List<double> calibrationRedshiftList = new List<double>();
-
-
-                if (doCalibration == 1 || doCalibration == 2)
-                {
-
-                    using (StreamReader reader = new StreamReader(args[0]))
-                    {
-
-                        string line;
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            string[] fields = line.Split(new char[] { '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-                            //Ignore empty, short or comment lines
-                            if (fields.Length > 30 && fields[0].Length > 0 && fields[0][0] != '#')
-                            {
-                                long matchID;
-
-                                if (long.TryParse(fields[0], out matchID))
-                                {
-
-                                    double redshift;
-                                    if (!double.TryParse(fields[30], out redshift))
-                                    {
-                                        redshift = Constants.missingDouble;
-                                    }
-
-                                    bool readError = false;
-                                    Flux tmpFlux = new Flux();
-
-                                    for (int i = 0; i < 14; ++i)
-                                    {
-                                        double tmp;
-
-                                        if (!double.TryParse(fields[2 * i + 2], out tmp))
-                                        {
-                                            readError = true;
-                                        }
-                                        tmpFlux.Value = tmp * 1e-29;
-
-                                        if (!double.TryParse(fields[2 * i + 3], out tmp))
-                                        {
-                                            readError = true;
-                                        }
-                                        tmpFlux.Error = tmp * 1e-29;
-
-                                        if (tmpFlux.Error <= 0.0)
-                                        {
-                                            magnitudeList[i].Value = -99;
-                                            magnitudeList[i].Error = -99;
-                                        }
-                                        else
-                                        {
-                                            if (tmpFlux.Value < 0.0)
-                                            {
-                                                tmpFlux.Value = 0.0;
-                                            }
-
-                                            magnitudeList[i] = tmpFlux.ConvertToMagnitude(MagnitudeSystem.Type.AB);
-                                        }
-
-                                    }
-
-                                    if (!readError)
-                                    {
-
-                                        List<Magnitude> magnitudeLocalCopy = new List<Magnitude>();
-                                        List<Filter> filterLocalCopy = new List<Filter>();
-
-                                        for (int i = 0; i < 14; ++i)
-                                        {
-                                            if (magnitudeList[i].Value != 99 && magnitudeList[i].Value != -99
-                                                && magnitudeList[i].Error != 99 && magnitudeList[i].Error > 0.0)
-                                            {
-                                                magnitudeLocalCopy.Add(new Magnitude(magnitudeList[i]));
-                                                filterLocalCopy.Add(filterList[i]);
-                                            }
-                                        }
-
-                                        double closestRedshift = templateLib.GetClosestParameterValueInCoverage("Redshift", redshift);
-
-
-                                        calibrationMagnitudeLists.Add(new List<Magnitude>(magnitudeLocalCopy));
-                                        calibrationFilterLists.Add(new List<Filter>(filterLocalCopy));
-                                        calibrationRedshiftList.Add(closestRedshift);
-
-                                    }
-
-                                }
-                            }
-                        }
-                    }
-
-
-
-                    TemplateFit.CalibrateFilterZeroPoints(0.01,
-                                                            100,
-                                                            templateLib,
-                                                            calibrationFilterLists,
-                                                            calibrationMagnitudeLists,
-                                                            calibrationRedshiftList,
-                                                            true);
-                }
-
                 if (photoSetup == 0 || photoSetup == 2)
                 {
                     priorInfo = new PriorFlat();
@@ -316,7 +213,125 @@ namespace Jhu.CANDELSParallelRunner
                     }
                 }
 
-                using (StreamReader reader = new StreamReader(args[1]))
+
+
+                if (doCalibration == 1 || doCalibration == 2)
+                {
+
+                    List<List<ValueWithErrorConvolveableFromFilterAndSpectrum>> calibrationMagnitudeLists = new List<List<ValueWithErrorConvolveableFromFilterAndSpectrum>>();
+                    List<List<Filter>> calibrationFilterLists = new List<List<Filter>>();
+                    List<double> calibrationRedshiftList = new List<double>();
+                    List<Matrix<double>> calibrationCorrelationMatrixList = new List<Matrix<double>>();
+
+                    using (StreamReader reader = new StreamReader(args[1]))
+                    {
+
+                        string line;
+                        while ((line = reader.ReadLine()) != null)
+                        {
+                            string[] fields = line.Split(new char[] { '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+                            //Ignore empty, short or comment lines
+                            if (fields.Length > 30 && fields[0].Length > 0 && fields[0][0] != '#')
+                            {
+                                long matchID;
+
+                                if (long.TryParse(fields[0], out matchID))
+                                {
+
+                                    double redshift;
+                                    if (!double.TryParse(fields[30], out redshift))
+                                    {
+                                        redshift = Constants.missingDouble;
+                                    }
+
+                                    bool readError = false;
+                                    Flux tmpFlux = new Flux();
+
+                                    for (int i = 0; i < numFiltersToUse; ++i)
+                                    {
+                                        double tmp;
+
+                                        if (!double.TryParse(fields[2 * i + 2], out tmp))
+                                        {
+                                            readError = true;
+                                        }
+                                        tmpFlux.Value = tmp * 1e-29;
+
+                                        if (!double.TryParse(fields[2 * i + 3], out tmp))
+                                        {
+                                            readError = true;
+                                        }
+                                        tmpFlux.Error = tmp * 1e-29;
+
+                                        if (tmpFlux.Error <= 0.0 || tmpFlux.Value <= 0.0)
+                                        {
+                                            magnitudeList[i].Value = -99;
+                                            magnitudeList[i].Error = -99;
+                                        }
+                                        else
+                                        {
+                                            magnitudeList[i] = tmpFlux.ConvertToMagnitude(MagnitudeSystem.Type.AB);
+                                        }
+
+                                    }
+
+                                    if (!readError)
+                                    {
+
+                                        List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeLocalCopy = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>();
+                                        List<Filter> filterLocalCopy = new List<Filter>();
+
+                                        for (int i = 0; i < numFiltersToUse; ++i)
+                                        {
+                                            if (magnitudeList[i].Value != 99 && magnitudeList[i].Value != -99
+                                                && magnitudeList[i].Error != 99 && magnitudeList[i].Error > 0.0)
+                                            {
+                                                magnitudeLocalCopy.Add((ValueWithErrorConvolveableFromFilterAndSpectrum)magnitudeList[i].Clone());
+                                                filterLocalCopy.Add(filterList[i]);
+                                            }
+                                        }
+
+                                        double closestRedshift = templateLib.GetClosestParameterValueInCoverage("Redshift", redshift);
+
+
+                                        calibrationMagnitudeLists.Add(new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(magnitudeLocalCopy));
+                                        calibrationFilterLists.Add(new List<Filter>(filterLocalCopy));
+                                        calibrationRedshiftList.Add(closestRedshift);
+
+                                        if (useIdentityCorrelationMatrix)
+                                        {
+                                            calibrationCorrelationMatrixList.Add(Matrix<double>.Build.DiagonalIdentity(filterLocalCopy.Count));
+                                        } 
+                                        else
+                                        {
+                                            calibrationCorrelationMatrixList.Add(null);
+                                        }
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+
+
+
+                    TemplateFit.CalibrateFilterZeroPoints(0.001,
+                                                            100,
+                                                            templateLib,
+                                                            calibrationFilterLists,
+                                                            calibrationMagnitudeLists,
+                                                            calibrationRedshiftList,
+                                                            fitInFluxSpace,
+                                                            errorSoftening,
+                                                            calibrationCorrelationMatrixList,
+                                                            false);
+                }
+
+                int galaxyCount = 0;
+                int taskCount = 0;
+
+                using (StreamReader reader = new StreamReader(args[0]))
                 {
 
                     string line;
@@ -341,7 +356,7 @@ namespace Jhu.CANDELSParallelRunner
                                 bool readError = false;
                                 Flux tmpFlux = new Flux();
 
-                                for (int i = 0; i < 14; ++i)
+                                for (int i = 0; i < numFiltersToUse; ++i)
                                 {
                                     double tmp;
 
@@ -357,41 +372,39 @@ namespace Jhu.CANDELSParallelRunner
                                     }
                                     tmpFlux.Error = tmp * 1e-29;
 
-                                    if (tmpFlux.Error <= 0.0)
+
+                                    if (tmpFlux.Error <= 0.0 || tmpFlux.Value <= 0.0)
                                     {
                                         magnitudeList[i].Value = -99;
                                         magnitudeList[i].Error = -99;
                                     }
                                     else
                                     {
-                                        if (tmpFlux.Value < 0.0)
-                                        {
-                                            tmpFlux.Value = 0.0;
-                                        }
-
                                         magnitudeList[i] = tmpFlux.ConvertToMagnitude(MagnitudeSystem.Type.AB);
                                     }
+
+
                                 }
 
                                 if (!readError)
                                 {
 
-                                    List<Magnitude> magnitudeLocalCopy = new List<Magnitude>();
+                                    List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeLocalCopy = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>();
                                     List<Filter> filterLocalCopy = new List<Filter>();
                                     List<string> filterStringLocalCopy = new List<string>();
 
-                                    for (int i = 0; i < 14; ++i)
+                                    for (int i = 0; i < numFiltersToUse; ++i)
                                     {
                                         if (magnitudeList[i].Value != 99 && magnitudeList[i].Value != -99
                                             && magnitudeList[i].Error != 99 && magnitudeList[i].Error != -99)
                                         {
-                                            magnitudeLocalCopy.Add(new Magnitude(magnitudeList[i]));
+                                            magnitudeLocalCopy.Add((ValueWithErrorConvolveableFromFilterAndSpectrum)magnitudeList[i].Clone());
                                             filterLocalCopy.Add(filterList[i]);
                                             filterStringLocalCopy.Add(aFilterTags[i]);
                                         }
                                     }
 
-                                    double closestRedshift = templateLib.GetClosestParameterValueInCoverage("Redshift", redshift);
+                                    //double closestRedshift = templateLib.GetClosestParameterValueInCoverage("Redshift", redshift);
 
                                     int localGalaxyCount = ++galaxyCount;
 
@@ -430,9 +443,10 @@ namespace Jhu.CANDELSParallelRunner
                                                                                                 args[2],
                                                                                                 redshift,
                                                                                                 matchID,
-                                                                                                true,
+                                                                                                fitInFluxSpace,
                                                                                                 errorSoftening,
                                                                                                 applyFilterErrorCorrection,
+                                                                                                useIdentityCorrelationMatrix,
                                                                                                 filterStringLocalCopy),
                                                             TaskCreationOptions.LongRunning);
 
@@ -465,7 +479,7 @@ namespace Jhu.CANDELSParallelRunner
         }
 
 
-        private static void DoBayesianAnalysisWithOutput(List<Magnitude> magnitudeList,
+        private static void DoBayesianAnalysisWithOutput(List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeList,
                                                              Template templateLib,
                                                              Prior priorInfo,
                                                              List<Filter> filterList,
@@ -478,25 +492,48 @@ namespace Jhu.CANDELSParallelRunner
                                                              bool fitInFluxSpace,
                                                              double errorSoftening,
                                                              bool applyFilterErrorCalibration,
+                                                             bool useIdentityCorrelationMatrix,
                                                              List<string> filterStringList)
         {
             List<double> redshifts, redshiftProbabilities;
-            bool fitError;
+            int fitError;
 
-            Spectrum result = TemplateFit.GetBayesianBestTemplateFit(templateLib, priorInfo, filterList, magnitudeList, fitInFluxSpace, errorSoftening, applyFilterErrorCalibration, out redshifts, out redshiftProbabilities, out fitError);
+            Matrix<double> corrMat;
+            bool matInverted = false;
+            if (useIdentityCorrelationMatrix)
+            {
+                corrMat = Matrix<double>.Build.DiagonalIdentity(filterList.Count);
+            }
+            else
+            {
+                corrMat = null;
+            }
+
+            Spectrum result = TemplateFit.GetBayesianBestTemplateFit(   templateLib, 
+                                                                        priorInfo, 
+                                                                        filterList,
+                                                                        magnitudeList, 
+                                                                        fitInFluxSpace, 
+                                                                        errorSoftening, 
+                                                                        applyFilterErrorCalibration, 
+                                                                        out redshifts, 
+                                                                        out redshiftProbabilities, 
+                                                                        out fitError,
+                                                                        corrMat,
+                                                                        matInverted);
 
             double maximumProb = 0.0;
             double maximumProbZ = -9999;
             List<Magnitude> synthMags = new List<Magnitude>(magnitudeList.Count);
 
             double redshiftResult = -9999;
-            if (!fitError)
+            if (fitError==0)
             {
                 redshiftResult = result.Redshift;
 
                 for (int i = 0; i < magnitudeList.Count; ++i)
                 {
-                    synthMags.Add(new Magnitude() { MagSystem = magnitudeList[i].MagSystem });
+                    synthMags.Add(new Magnitude() { MagSystem = ((Magnitude)magnitudeList[i]).MagSystem });
                     synthMags[i].ConvolveFromFilterAndSpectrum(result, filterList[i]);
                 }
 
@@ -523,7 +560,7 @@ namespace Jhu.CANDELSParallelRunner
                     Console.Out.Write("-9999\t");
                 }
 
-                if (!fitError)
+                if (fitError == 0)
                 {
 
                     Console.Out.Write(redshiftResult.ToString() + '\t');
@@ -567,7 +604,7 @@ namespace Jhu.CANDELSParallelRunner
                     Console.Out.Write(magnitudeList[i].Value.ToString() + '\t');
                     Console.Out.Write(magnitudeList[i].Error.ToString() + '\t');
 
-                    if (!fitError)
+                    if (fitError == 0)
                     {
                         Console.Out.Write(synthMags[i].Value.ToString() + '\t');
                     }
@@ -586,7 +623,7 @@ namespace Jhu.CANDELSParallelRunner
 
             using (StreamWriter outputFile = new StreamWriter(probDistFilePath))
             {
-                if (!fitError)
+                if (fitError == 0)
                 {
                     for (int i = 0; i < redshifts.Count; ++i)
                     {
@@ -616,7 +653,7 @@ namespace Jhu.CANDELSParallelRunner
 
             using (StreamWriter outputFile = new StreamWriter(specFilePath))
             {
-                if (!fitError)
+                if (fitError == 0)
                 {
 
                     outputFile.Write("#SpecZ=" + redshift.ToString() + " BestFitPhotoZ=" + redshiftResult.ToString() + " MaxProbPhotoZ=" + maximumProbZ.ToString() + '\n');
@@ -629,7 +666,7 @@ namespace Jhu.CANDELSParallelRunner
                         if (i < filterList.Count)
                         {
                             Flux synthFlux = synthMags[i].ConvertToFlux();
-                            Flux origFlux = magnitudeList[i].ConvertToFlux();
+                            Flux origFlux = ((Magnitude)magnitudeList[i]).ConvertToFlux();
 
                             outputFile.Write(binCenters[i].ToString() + '\t' + fluxes[i].ToString()
                                                 + '\t' + filterList[i].EffectiveWavelength.ToString()

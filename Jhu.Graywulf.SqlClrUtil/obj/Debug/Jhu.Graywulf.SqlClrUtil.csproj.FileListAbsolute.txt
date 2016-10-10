@@ -1,0 +1,6 @@
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\bin\Debug\gwsqlclrutil.exe.config
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\obj\Debug\Jhu.Graywulf.SqlClrUtil.csprojResolveAssemblyReference.cache
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\bin\Debug\gwsqlclrutil.exe
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\bin\Debug\gwsqlclrutil.pdb
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\obj\Debug\gwsqlclrutil.exe
+d:\RBeck_Work\SQLCLR\Jhu.Graywulf.SqlClrUtil\obj\Debug\gwsqlclrutil.pdb

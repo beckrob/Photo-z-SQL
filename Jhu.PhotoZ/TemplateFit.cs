@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
+using MathNet.Numerics.LinearAlgebra;
 
 //using System.IO;
 
@@ -14,31 +15,45 @@ namespace Jhu.PhotoZ
     {
 
         public static Spectrum GetBestChiSquareFit( Template spectrumTemplate, 
-                                                    List<Filter> filterList, 
-                                                    List<Magnitude> magnitudeList, 
+                                                    List<Filter> filterList,
+                                                    List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeFluxList, 
                                                     bool fitInFluxSpace,
-                                                    double errorSofteningParameter,
+                                                    double errorSofteningParameter, //Extra, uncorrelated photometric error added - in AB magnitudes
                                                     bool applyFilterErrorCalibration,
-                                                    out bool error)
+                                                    out int error,
+                                                    Matrix<double> correlationMatrix=null,
+                                                    bool correlationMatrixAlreadyInverted=false)
         {
 
-            error = false;
+            error = 0;
 
             Spectrum bestFitSpectrum = null;
 
 
             //We cannot fit for a single filter, the constant offset is a parameter in the chi-square fit
-            if (filterList.Count > 1 && 
-                filterList.Count == magnitudeList.Count)
+            if (filterList.Count > 1 &&
+                filterList.Count == magnitudeFluxList.Count)
             {
                 List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeOrFluxListAB = SetupABMagOrFluxListWithErrorScaling( filterList,
-                                                                                                                                    magnitudeList,
+                                                                                                                                    magnitudeFluxList,
                                                                                                                                     fitInFluxSpace,
                                                                                                                                     errorSofteningParameter,
                                                                                                                                     applyFilterErrorCalibration);
 
                 double sigmaSqrReciprocalSum;
-                if (GetChiSquareConstantFactor(magnitudeOrFluxListAB, fitInFluxSpace, out sigmaSqrReciprocalSum))
+                Matrix<double> sigmaReciprocalProductMatrix;
+                Vector<double> sigmaReciprocalProductVector;
+                if (!ReferenceEquals(correlationMatrix, null) && !correlationMatrixAlreadyInverted)
+                {
+                    correlationMatrix = correlationMatrix.Inverse();
+                }
+
+                if (GetChiSquareConstantFactor( magnitudeOrFluxListAB, 
+                                                fitInFluxSpace, 
+                                                correlationMatrix, 
+                                                out sigmaSqrReciprocalSum,
+                                                out sigmaReciprocalProductMatrix, 
+                                                out sigmaReciprocalProductVector))
                 {
 
                     double minChiSqr = -Constants.missingDouble;
@@ -78,7 +93,10 @@ namespace Jhu.PhotoZ
                             double constantOffsetOrMultiplier = GetMinimumChiSquareFitParameter(magnitudeOrFluxListAB,
                                                                                                 SyntheticMagnitudeOrFluxList,
                                                                                                 fitInFluxSpace,
-                                                                                                sigmaSqrReciprocalSum);
+                                                                                                correlationMatrix,
+                                                                                                sigmaSqrReciprocalSum,
+                                                                                                sigmaReciprocalProductMatrix,
+                                                                                                sigmaReciprocalProductVector);
 
                             if (fitInFluxSpace)
                             {
@@ -98,7 +116,7 @@ namespace Jhu.PhotoZ
 
 
                             double chiSqr = 0.0;
-                            if (!GetChiSquareValue(magnitudeOrFluxListAB, SyntheticMagnitudeOrFluxList, out chiSqr))
+                            if (!GetChiSquareValue(magnitudeOrFluxListAB, SyntheticMagnitudeOrFluxList, correlationMatrix, out chiSqr))
                             {
                                 fitError = true;
                             }
@@ -146,24 +164,24 @@ namespace Jhu.PhotoZ
                         }
                         else
                         {
-                            error = true;
+                            error = -1;
                         }                  
                     }
                     else
                     {
-                        error = true;
+                        error = -2;
                     }
 
                 } 
                 else 
                 {
-                    error = true;
+                    error = -3;
                 }
 
             }
             else 
             {
-                error = true;
+                error = -4;
             }
 
             return bestFitSpectrum;
@@ -193,24 +211,24 @@ namespace Jhu.PhotoZ
                 avgErr = Constants.missingDouble;
             }
 
-            positiveFluxInRange = avgFluxOrMag + 3 * avgErr > 0;
+            positiveFluxInRange = avgFluxOrMag + (3.0 * avgErr / magnitudeOrFluxListAB.Count) > 0;
 
             if (numberOfSteps > 1)
             {
                 if (fitInFluxSpace)
                 {
-                    if (avgFluxOrMag - 3 * avgErr > 0)
+                    if (avgFluxOrMag - (3.0 * avgErr / magnitudeOrFluxListAB.Count) > 0)
                     {
-                        iterationStepSize = Math.Pow(1.0 - 3.0 * avgErr / avgFluxOrMag, -2.0 / (numberOfSteps - 1.0));
+                        iterationStepSize = Math.Pow(1.0 - (3.0 * avgErr / magnitudeOrFluxListAB.Count) / avgFluxOrMag, -2.0 / (numberOfSteps - 1.0));
                     }
                     else
                     {
-                        iterationStepSize = Math.Pow(1.0 + 3.0 * avgErr / avgFluxOrMag, 2.0 / (numberOfSteps - 1.0));
+                        iterationStepSize = Math.Pow(1.0 + (3.0 * avgErr / magnitudeOrFluxListAB.Count) / avgFluxOrMag, 2.0 / (numberOfSteps - 1.0));
                     }
                 }
                 else
                 {
-                    iterationStepSize = 3 * avgErr / ((numberOfSteps - 1) / 2);
+                    iterationStepSize = (3.0 * avgErr / magnitudeOrFluxListAB.Count) / ((numberOfSteps - 1) / 2);
                 }
             }
             else
@@ -224,28 +242,69 @@ namespace Jhu.PhotoZ
         //Calculate the factors for the best-fitting chi-square constant offset/multiplier
         private static bool GetChiSquareConstantFactor(List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeOrFluxList, 
                                                        bool isFittingFlux,
-                                                       out double sigmaSqrReciprocalSum)
+                                                       Matrix<double> correlationMatrix,
+                                                       out double sigmaSqrReciprocalSum,
+                                                       out Matrix<double> sigmaReciprocalProductMatrix,
+                                                       out Vector<double> sigmaReciprocalProductVector)
         {
-
-            sigmaSqrReciprocalSum = 0.0;
 
             for (int i = 0; i < magnitudeOrFluxList.Count; ++i)
             {
                 if (magnitudeOrFluxList[i].Error == 0.0)
                 {
+                    sigmaSqrReciprocalSum = 0.0;
+                    sigmaReciprocalProductMatrix = null;
+                    sigmaReciprocalProductVector = null;
+
                     return false;
                 }         
             }
 
-            if (isFittingFlux)
+            if (ReferenceEquals(correlationMatrix, null))
             {
-                sigmaSqrReciprocalSum = 1.0;
-            } 
+                sigmaSqrReciprocalSum = 0.0;
+
+                if (isFittingFlux)
+                {
+                    sigmaSqrReciprocalSum = 1.0;
+                } 
+                else 
+                {
+                    for (int i = 0; i < magnitudeOrFluxList.Count; ++i)
+                    {
+                        sigmaSqrReciprocalSum += 1.0 / (magnitudeOrFluxList[i].Error * magnitudeOrFluxList[i].Error);
+                    }
+                }
+
+                sigmaReciprocalProductMatrix = null;
+                sigmaReciprocalProductVector = null;
+            }
             else 
             {
-                for (int i = 0; i < magnitudeOrFluxList.Count; ++i)
+
+                if (isFittingFlux)
                 {
-                    sigmaSqrReciprocalSum += 1.0 / (magnitudeOrFluxList[i].Error * magnitudeOrFluxList[i].Error);
+                    sigmaSqrReciprocalSum = 1.0;
+                    sigmaReciprocalProductMatrix = null;
+                    sigmaReciprocalProductVector = null;
+                }
+                else
+                {
+                    Double[] storage = new Double[magnitudeOrFluxList.Count];
+                    for (int i = 0; i < magnitudeOrFluxList.Count; ++i)
+                    {
+                        storage[i] = 1.0 / magnitudeOrFluxList[i].Error;
+                    }
+
+                    Vector<double> sigmaReciprocalVector = Vector<double>.Build.Dense(storage);
+                    Matrix<double> sigmaReciprocalRowVector = Matrix<double>.Build.Dense(1, magnitudeOrFluxList.Count, storage);
+
+
+                    sigmaReciprocalProductMatrix = sigmaReciprocalRowVector * correlationMatrix;
+                    sigmaReciprocalProductVector = correlationMatrix * sigmaReciprocalVector;
+
+                    sigmaSqrReciprocalSum = sigmaReciprocalVector * sigmaReciprocalProductVector;
+
                 }
             }
 
@@ -256,9 +315,10 @@ namespace Jhu.PhotoZ
         //Calculate the chi-square value from measured and fitted magnitudes
         private static bool GetChiSquareValue(  List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeOrFluxList,
                                                 List<ValueWithErrorConvolveableFromFilterAndSpectrum> synthMagnitudeOrFluxList, 
+                                                Matrix<double> correlationMatrix,
                                                 out double chiSqr)
         {
-            chiSqr=0.0;
+            chiSqr = 0.0;
 
             if (magnitudeOrFluxList.Count < 2)
             {
@@ -272,13 +332,28 @@ namespace Jhu.PhotoZ
                     //chiSqr diverges in this case
                     return false;
                 }
-
-                chiSqr += (synthMagnitudeOrFluxList[i].Value - magnitudeOrFluxList[i].Value) * (synthMagnitudeOrFluxList[i].Value - magnitudeOrFluxList[i].Value)
-                                                / (magnitudeOrFluxList[i].Error * magnitudeOrFluxList[i].Error);
-
             }
-            chiSqr /= (magnitudeOrFluxList.Count - 1);
 
+            if (ReferenceEquals(correlationMatrix, null))
+            {
+                for (int i = 0; i < magnitudeOrFluxList.Count; ++i)
+                {
+                    chiSqr += (synthMagnitudeOrFluxList[i].Value - magnitudeOrFluxList[i].Value) * (synthMagnitudeOrFluxList[i].Value - magnitudeOrFluxList[i].Value)
+                                                    / (magnitudeOrFluxList[i].Error * magnitudeOrFluxList[i].Error);
+                }
+            }
+            else
+            {
+                Double[] storage = new Double[magnitudeOrFluxList.Count];
+                for (int i = 0; i < magnitudeOrFluxList.Count; ++i)
+                {
+                    storage[i] = (magnitudeOrFluxList[i].Value - synthMagnitudeOrFluxList[i].Value) / magnitudeOrFluxList[i].Error;
+                }
+
+                Vector<double> residualVector = Vector<double>.Build.Dense(storage);
+
+                chiSqr = residualVector * (correlationMatrix * residualVector);
+            }
 
             return true;
      
@@ -324,48 +399,90 @@ namespace Jhu.PhotoZ
             return true;
         }
 
+
         private static double GetMinimumChiSquareFitParameter(  List<ValueWithErrorConvolveableFromFilterAndSpectrum > magnitudeOrFluxListAB,
                                                                 List<ValueWithErrorConvolveableFromFilterAndSpectrum> SyntheticMagnitudeOrFluxList,
                                                                 bool fitInFluxSpace,
-                                                                double sigmaSqrReciprocalSum)
+                                                                Matrix<double> correlationMatrix,
+                                                                double sigmaSqrReciprocalSum,
+                                                                Matrix<double> sigmaReciprocalProductMatrix,
+                                                                Vector<double> sigmaReciprocalProductVector)
         {
-            double syntheticComponentRHSSum = 0.0;
-            double fluxLHSSum = 0.0;
-
-            if (fitInFluxSpace)
+            if (ReferenceEquals(correlationMatrix, null))
             {
-                for (int i = 0; i < magnitudeOrFluxListAB.Count; ++i)
-                {
-                    //MagError cannot be zero at this point (sigmaSqrReducedSum would have been bad already)
+                double syntheticComponentRHSSum = 0.0;
+                double fluxLHSSum = 0.0;
 
-                    syntheticComponentRHSSum += (magnitudeOrFluxListAB[i].Value * SyntheticMagnitudeOrFluxList[i].Value) /
-                                                (magnitudeOrFluxListAB[i].Error * magnitudeOrFluxListAB[i].Error);
-                    fluxLHSSum += (SyntheticMagnitudeOrFluxList[i].Value * SyntheticMagnitudeOrFluxList[i].Value) /
-                                    (magnitudeOrFluxListAB[i].Error * magnitudeOrFluxListAB[i].Error);
+                if (fitInFluxSpace)
+                {
+                    for (int i = 0; i < magnitudeOrFluxListAB.Count; ++i)
+                    {
+                        //MagError cannot be zero at this point (sigmaSqrReducedSum would have been bad already)
+
+                        syntheticComponentRHSSum += (magnitudeOrFluxListAB[i].Value * SyntheticMagnitudeOrFluxList[i].Value) /
+                                                    (magnitudeOrFluxListAB[i].Error * magnitudeOrFluxListAB[i].Error);
+                        fluxLHSSum += (SyntheticMagnitudeOrFluxList[i].Value * SyntheticMagnitudeOrFluxList[i].Value) /
+                                        (magnitudeOrFluxListAB[i].Error * magnitudeOrFluxListAB[i].Error);
+                    }
                 }
+                else
+                {
+                    for (int i = 0; i < magnitudeOrFluxListAB.Count; ++i)
+                    {
+                        //MagError cannot be zero at this point (sigmaSqrReducedSum would have been bad already)
+
+                        syntheticComponentRHSSum += (magnitudeOrFluxListAB[i].Value - SyntheticMagnitudeOrFluxList[i].Value) /
+                                                    (magnitudeOrFluxListAB[i].Error * magnitudeOrFluxListAB[i].Error);
+
+
+                    }
+                    fluxLHSSum = 1.0;
+                }
+
+                return syntheticComponentRHSSum / sigmaSqrReciprocalSum / fluxLHSSum;
             }
             else
             {
-                for (int i = 0; i < magnitudeOrFluxListAB.Count; ++i)
+                if (fitInFluxSpace)
                 {
-                    //MagError cannot be zero at this point (sigmaSqrReducedSum would have been bad already)
+                    Double[] storage1 = new Double[magnitudeOrFluxListAB.Count];
+                    Double[] storage2 = new Double[magnitudeOrFluxListAB.Count];
+                    for (int i = 0; i < magnitudeOrFluxListAB.Count; ++i)
+                    {
+                        storage1[i] = magnitudeOrFluxListAB[i].Value / magnitudeOrFluxListAB[i].Error;
+                        storage2[i] = SyntheticMagnitudeOrFluxList[i].Value / magnitudeOrFluxListAB[i].Error;
+                    }
 
-                    syntheticComponentRHSSum += (magnitudeOrFluxListAB[i].Value - SyntheticMagnitudeOrFluxList[i].Value) /
-                                                (magnitudeOrFluxListAB[i].Error * magnitudeOrFluxListAB[i].Error);
-                    
+                    Vector<double> scaledMeasuredFluxVector = Vector<double>.Build.Dense(storage1);
+                    Vector<double> scaledSyntheticFluxVector = Vector<double>.Build.Dense(storage2);
 
+                    Vector<double> matrixTimesSynthFlucVect = correlationMatrix * scaledSyntheticFluxVector;
+
+                    double rhs = scaledSyntheticFluxVector * (correlationMatrix * scaledMeasuredFluxVector) + scaledMeasuredFluxVector * matrixTimesSynthFlucVect;
+
+                    return rhs / (2.0 * scaledSyntheticFluxVector * matrixTimesSynthFlucVect);
                 }
-                fluxLHSSum = 1.0;
-            }
+                else
+                {
+                    Double[] storage = new Double[magnitudeOrFluxListAB.Count];
+                    for (int i = 0; i < magnitudeOrFluxListAB.Count; ++i)
+                    {
+                        storage[i] = (magnitudeOrFluxListAB[i].Value - SyntheticMagnitudeOrFluxList[i].Value) / magnitudeOrFluxListAB[i].Error;
+                    }
 
-            return syntheticComponentRHSSum / sigmaSqrReciprocalSum / fluxLHSSum;
+                    Vector<double> residualVector = Vector<double>.Build.Dense(storage);
+
+                    return ((sigmaReciprocalProductMatrix * residualVector)[0] + residualVector * sigmaReciprocalProductVector) / (2.0 * sigmaSqrReciprocalSum);
+                }
+
+            }
         }
 
         private static void EvaluateProbabilityAtCurrentParameters( List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeOrFluxListAB,
                                                                     List<ValueWithErrorConvolveableFromFilterAndSpectrum> SyntheticMagnitudeOrFluxList,
+                                                                    Matrix<double> correlationMatrix,
                                                                     double storedLuminosity,
                                                                     double fluxOrig,
-                                                                    double DOF,
                                                                     bool fitInFluxSpace,
                                                                     Template spectrumTemplate,
                                                                     Prior priorInformation,
@@ -374,7 +491,7 @@ namespace Jhu.PhotoZ
                                                                     ref List<TemplateParameter> bestFitParameters)
         {
             double chiSqr = 0.0;
-            if (GetChiSquareValue(magnitudeOrFluxListAB, SyntheticMagnitudeOrFluxList, out chiSqr))
+            if (GetChiSquareValue(magnitudeOrFluxListAB, SyntheticMagnitudeOrFluxList, correlationMatrix, out chiSqr))
             {
 
                 double fluxScaled;
@@ -394,7 +511,7 @@ namespace Jhu.PhotoZ
                 //Using the likelihood function assuming that the different filter magnitudes are independent of each other, and errors are normally distributed
                 //Ignoring pre-factors in the distribution that are not chiSqr dependent, as those are common in all templates
                 double priorProb = priorInformation.Evaluate(spectrumTemplate.GetParameterList());
-                double exponential = Math.Exp(-chiSqr * DOF / 2.0);
+                double exponential = Math.Exp(-chiSqr / 2.0);
 
                 double probability = exponential * priorProb;
 
@@ -415,69 +532,98 @@ namespace Jhu.PhotoZ
         }
 
         private static List<ValueWithErrorConvolveableFromFilterAndSpectrum> SetupABMagOrFluxListWithErrorScaling(  List<Filter> filterList,
-                                                                                                                    List<Magnitude> magnitudeList,
+                                                                                                                    List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeFluxList,
                                                                                                                     bool fitInFluxSpace,
                                                                                                                     double errorSofteningParameter,
                                                                                                                     bool applyFilterErrorCalibration)
         {
-            List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeOrFluxListAB;
+            if (magnitudeFluxList.Count > 0)
+            {
+                List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeOrFluxListAB;
 
-            if (fitInFluxSpace)
-            {
-                magnitudeOrFluxListAB = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(
-                                                magnitudeList.Select(x => x.ConvertToFlux()));
-            }
-            else
-            {
-                magnitudeOrFluxListAB = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(
-                                                magnitudeList.Select(x => (new Magnitude(x)).ConvertToMagnitudeSystem(MagnitudeSystem.Type.AB)));
-            }
-
-            if (applyFilterErrorCalibration)
-            {
-                for (int i = 0; i < filterList.Count; ++i)
+                if (magnitudeFluxList[0] is Magnitude)
                 {
-                    if (filterList[i].ZeroPointErrorCalibration > 1.0)
+                    if (fitInFluxSpace)
                     {
-                        magnitudeOrFluxListAB[i].Error *= filterList[i].ZeroPointErrorCalibration;
+                        magnitudeOrFluxListAB = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(
+                                                        magnitudeFluxList.Select(x => ((Magnitude)x).ConvertToFlux()));
+                    }
+                    else
+                    {
+                        magnitudeOrFluxListAB = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(
+                                                        magnitudeFluxList.Select(x => ((Magnitude)x.Clone()).ConvertToMagnitudeSystem(MagnitudeSystem.Type.AB)));
                     }
                 }
-            }
-
-            if (errorSofteningParameter != 0.0)
-            {
-                if (fitInFluxSpace)
+                else if (magnitudeFluxList[0] is Flux)
                 {
-                    foreach (ValueWithErrorConvolveableFromFilterAndSpectrum fluxOrMag in magnitudeOrFluxListAB)
+                    if (fitInFluxSpace)
                     {
-                        fluxOrMag.Error = Math.Sqrt(fluxOrMag.Error * fluxOrMag.Error +
-                                                    errorSofteningParameter * errorSofteningParameter * fluxOrMag.Value * fluxOrMag.Value);
+                        magnitudeOrFluxListAB = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(
+                                                        magnitudeFluxList.Select(x => ((Flux)x.Clone())));
+                    }
+                    else
+                    {
+                        magnitudeOrFluxListAB = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(
+                                                        magnitudeFluxList.Select(x => ((Flux)x).ConvertToMagnitude(MagnitudeSystem.Type.AB)));
                     }
                 }
                 else
                 {
-                    foreach (ValueWithErrorConvolveableFromFilterAndSpectrum fluxOrMag in magnitudeOrFluxListAB)
+                    magnitudeOrFluxListAB = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>();
+                }
+
+
+                if (errorSofteningParameter != 0.0)
+                {
+                    if (fitInFluxSpace)
                     {
-                        fluxOrMag.Error = Math.Sqrt(fluxOrMag.Error * fluxOrMag.Error + errorSofteningParameter * errorSofteningParameter * 2.5 * 2.5 / Math.Log(10) / Math.Log(10));
+                        foreach (ValueWithErrorConvolveableFromFilterAndSpectrum fluxOrMag in magnitudeOrFluxListAB)
+                        {
+                            fluxOrMag.Error = Math.Sqrt(fluxOrMag.Error * fluxOrMag.Error +
+                                                        errorSofteningParameter * errorSofteningParameter / 2.5 / 2.5 * Math.Log(10) * Math.Log(10) * fluxOrMag.Value * fluxOrMag.Value);
+                        }
+                    }
+                    else
+                    {
+                        foreach (ValueWithErrorConvolveableFromFilterAndSpectrum fluxOrMag in magnitudeOrFluxListAB)
+                        {
+                            fluxOrMag.Error = Math.Sqrt(fluxOrMag.Error * fluxOrMag.Error + errorSofteningParameter * errorSofteningParameter);
+                        }
                     }
                 }
+
+                if (applyFilterErrorCalibration)
+                {
+                    for (int i = 0; i < filterList.Count; ++i)
+                    {
+                        //TODO decide whether to allow the downscaling of errors
+                        //if (filterList[i].ZeroPointErrorCalibration > 1.0)
+                        //{
+                        magnitudeOrFluxListAB[i].Error *= filterList[i].ZeroPointErrorCalibration;
+                        //}
+                    }
+                }
+
+                return magnitudeOrFluxListAB;
             }
 
-            return magnitudeOrFluxListAB;
+            return new List<ValueWithErrorConvolveableFromFilterAndSpectrum>();
         }
 
 
 
         public static Spectrum GetBayesianBestTemplateFit(  Template spectrumTemplate, 
                                                             Prior priorInformation,
-                                                            List<Filter> filterList, 
-                                                            List<Magnitude> magnitudeList,
+                                                            List<Filter> filterList,
+                                                            List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeFluxList,
                                                             bool fitInFluxSpace,
-                                                            double errorSofteningParameter,
+                                                            double errorSofteningParameter, //Extra, uncorrelated photometric error added - in AB magnitudes
                                                             bool applyFilterErrorCalibration,
                                                             out List<double> redshiftValues, 
-                                                            out List<double> redshiftProbabilities, 
-                                                            out bool error)
+                                                            out List<double> redshiftProbabilities,
+                                                            out int error,
+                                                            Matrix<double> correlationMatrix = null,
+                                                            bool correlationMatrixAlreadyInverted = false)
         {
 
             redshiftValues = spectrumTemplate.GetParameterCoverage("Redshift");
@@ -487,18 +633,18 @@ namespace Jhu.PhotoZ
                 redshiftProbabilities.Add(0.0);
             }
 
-            error = false;
+            error = 0;
 
             List<TemplateParameter> bestFitParameters = null;
             Spectrum bestFitSpectrum = null;
 
             //We cannot fit for a single filter, the constant offset is a parameter in the chi-square fit
             if (filterList.Count > 1 &&
-                filterList.Count == magnitudeList.Count)
+                filterList.Count == magnitudeFluxList.Count)
             {
 
                 List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeOrFluxListAB = SetupABMagOrFluxListWithErrorScaling( filterList,
-                                                                                                                                    magnitudeList,
+                                                                                                                                    magnitudeFluxList,
                                                                                                                                     fitInFluxSpace,
                                                                                                                                     errorSofteningParameter,
                                                                                                                                     applyFilterErrorCalibration);
@@ -508,14 +654,25 @@ namespace Jhu.PhotoZ
                 GetIterationStepSize(magnitudeOrFluxListAB, spectrumTemplate.IterationStepsWhenIgnoringLuminosity, fitInFluxSpace, out positiveFluxInRange, out iterationStepSize);
 
                 double sigmaSqrReciprocalSum;
+                Matrix<double> sigmaReciprocalProductMatrix;
+                Vector<double> sigmaReciprocalProductVector;
+                if (!ReferenceEquals(correlationMatrix, null) && !correlationMatrixAlreadyInverted)
+                {
+                    correlationMatrix = correlationMatrix.Inverse();
+                }
+
+
                 if ((!fitInFluxSpace || positiveFluxInRange)
                     && priorInformation.VerifyParameterlist(spectrumTemplate.GetParameterList())
-                    && GetChiSquareConstantFactor(magnitudeOrFluxListAB, fitInFluxSpace, out sigmaSqrReciprocalSum))
+                    && GetChiSquareConstantFactor(  magnitudeOrFluxListAB, 
+                                                    fitInFluxSpace,
+                                                    correlationMatrix,
+                                                    out sigmaSqrReciprocalSum,
+                                                    out sigmaReciprocalProductMatrix,
+                                                    out sigmaReciprocalProductVector))
                 {
 
                     double maxProbability = Constants.missingDouble;
-
-                    double DOF = (magnitudeOrFluxListAB.Count - 1);
 
                     //Creating container for synthetic magnitudes
                     //Here the magnitude system property is copied
@@ -552,8 +709,10 @@ namespace Jhu.PhotoZ
                             double constantOffsetOrMultiplier = GetMinimumChiSquareFitParameter(magnitudeOrFluxListAB,
                                                                                                 SyntheticMagnitudeOrFluxList,
                                                                                                 fitInFluxSpace,
-                                                                                                sigmaSqrReciprocalSum);
-
+                                                                                                correlationMatrix,
+                                                                                                sigmaSqrReciprocalSum,
+                                                                                                sigmaReciprocalProductMatrix,
+                                                                                                sigmaReciprocalProductVector);
 
                             double fluxOrig;
                             if (fitInFluxSpace)
@@ -583,11 +742,11 @@ namespace Jhu.PhotoZ
 
                             //Starting iteration in luminosity space in the center, then going from the edges
                             //This way bestFitParameters hopefully does not have to be recopied as many times (depending on prior)
-                            EvaluateProbabilityAtCurrentParameters(magnitudeOrFluxListAB,
+                            EvaluateProbabilityAtCurrentParameters( magnitudeOrFluxListAB,
                                                                     SyntheticMagnitudeOrFluxList,
+                                                                    correlationMatrix,
                                                                     storedLuminosity,
                                                                     fluxOrig,
-                                                                    DOF,
                                                                     fitInFluxSpace,
                                                                     spectrumTemplate,
                                                                     priorInformation,
@@ -619,11 +778,11 @@ namespace Jhu.PhotoZ
                                     //Leaving out center point, which was done previously
                                     if (step != ((spectrumTemplate.IterationStepsWhenIgnoringLuminosity - 1) / 2))
                                     {
-                                        EvaluateProbabilityAtCurrentParameters(magnitudeOrFluxListAB,
+                                        EvaluateProbabilityAtCurrentParameters( magnitudeOrFluxListAB,
                                                                                 SyntheticMagnitudeOrFluxList,
+                                                                                correlationMatrix,
                                                                                 storedLuminosity,
                                                                                 fluxOrig,
-                                                                                DOF,
                                                                                 fitInFluxSpace,
                                                                                 spectrumTemplate,
                                                                                 priorInformation,
@@ -678,23 +837,23 @@ namespace Jhu.PhotoZ
                         }
                         else
                         {
-                            error = true;
+                            error = -1;
                         }
                     }
                     else
                     {
-                        error = true;
+                        error = -2;
                     }
 
                 }
                 else
                 {
-                    error = true;
+                    error = -3;
                 }
             }
             else
             {
-                error = true;
+                error = -4;
             }
 
             return bestFitSpectrum;
@@ -707,23 +866,50 @@ namespace Jhu.PhotoZ
                                                         int iterationLimit,
                                                         Template spectrumTemplate,
                                                         List<List<Filter>> filterLists,
-                                                        List<List<Magnitude>> magnitudeLists,
+                                                        List<List<ValueWithErrorConvolveableFromFilterAndSpectrum>> magnitudeFluxLists,
                                                         List<double> redshiftList, //Can be null
-                                                        bool fitInFluxSpace)
+                                                        bool fitInFluxSpace = false,
+                                                        double errorSofteningParameter = 0.0,
+                                                        List<Matrix<double>> correlationMatrixList = null,
+                                                        bool correlationMatrixAlreadyInverted = false)
         {
 
             if (ReferenceEquals(filterLists, null) ||
-                ReferenceEquals(magnitudeLists, null) ||
-                filterLists.Count!=magnitudeLists.Count ||
-                (!ReferenceEquals(redshiftList,null) && filterLists.Count!=redshiftList.Count) )
+                ReferenceEquals(magnitudeFluxLists, null) ||
+                filterLists.Count != magnitudeFluxLists.Count ||
+                (!ReferenceEquals(redshiftList,null) && filterLists.Count!=redshiftList.Count)  ||
+                (!ReferenceEquals(correlationMatrixList, null) && filterLists.Count != correlationMatrixList.Count))
             {
                 return false;
             }
 
-            int iterationNumber = 0;
-            double maxChange = 1e10;
-            double prevMaxChange = 1e10;
-            double prevPrevMaxChange = 1e10;
+            //Pre-invert correlation matrices so it doesn't have to be done multiple times during iteration
+            //Also, if correlationMatrixList is missing, fill up with null matrices so that correlationMatrixList[index] can be accessed later
+            if (!ReferenceEquals(correlationMatrixList, null))
+            {
+                if (!correlationMatrixAlreadyInverted)
+                {
+                    for (int i = 0; i < correlationMatrixList.Count; ++i)
+                    {
+                        if (!ReferenceEquals(correlationMatrixList[i], null))
+                        {
+                            correlationMatrixList[i] = correlationMatrixList[i].Inverse();
+                        }
+
+                    }
+                }
+            }
+            else
+            {
+                correlationMatrixList = new List<Matrix<double>>(filterLists.Count);
+
+                for (int i = 0; i < filterLists.Count; ++i)
+                {
+                    correlationMatrixList.Add(null);
+                }
+            }
+            correlationMatrixAlreadyInverted = true;
+
 
             List<Filter> distinctFilters = new List<Filter>();
             foreach(List<Filter> filterList in filterLists){
@@ -732,7 +918,54 @@ namespace Jhu.PhotoZ
             distinctFilters = distinctFilters.Distinct().ToList();
 
 
-            //TODO Change this if multiple filters will have the same calibration
+            /*All filter zeropoints should be calibrated together, using this distinctCorrelationMatrix, when available
+             *However, for now we calibrate them separately instead, as if they were not correlated
+             *
+            Matrix<double> distinctCorrelationMatrix;
+            if (ReferenceEquals(correlationMatrixList, null))
+            {
+                distinctCorrelationMatrix = null;
+            }
+            else
+            {
+                distinctCorrelationMatrix = Matrix<double>.Build.Dense(distinctFilters.Count, distinctFilters.Count, 0.0);
+
+                for (int i = 0; i < distinctFilters.Count; ++i)
+                {
+                    distinctCorrelationMatrix[i, i] = 1.0;
+                }
+
+                for (int obj = 0; obj < filterLists.Count; ++obj)
+                {
+
+                    if (!ReferenceEquals(correlationMatrixList[obj], null))
+                    {
+
+                        for (int i = 0; i < filterLists[obj].Count; ++i)
+                        {
+                            int indexI = distinctFilters.FindIndex(x => (x == filterLists[obj][i]));
+
+                            for (int j = i + 1; j < filterLists[obj].Count; ++j)
+                            {
+                                int indexJ = distinctFilters.FindIndex(x => (x == filterLists[obj][j]));
+
+                                distinctCorrelationMatrix[indexI, indexJ] = correlationMatrixList[obj][i, j];
+                                distinctCorrelationMatrix[indexJ, indexI] = correlationMatrixList[obj][j, i];
+                            }
+                        }
+
+                    }
+
+                }
+            }
+            */
+
+            int iterationNumber = 0;
+            double maxChange = 1e10;
+            double prevMaxChange = 1e10;
+            double prevPrevMaxChange = 1e10;
+
+            //TODO Change this if multiple distinct filters will have the same calibration
             Dictionary<Filter, int> filterIDDictionary = new Dictionary<Filter, int>();
             List<Object> filterLockList = new List<Object>(distinctFilters.Count);
             int count = 0;
@@ -753,7 +986,6 @@ namespace Jhu.PhotoZ
                 }
             }
 
-
             do
             {
                 //List<List<double>> synthListForFilter = new List<List<double>>(distinctFilters.Count);
@@ -767,7 +999,7 @@ namespace Jhu.PhotoZ
                 List<List<double>> measuredFluxErrorListForFilter = new List<List<double>>(distinctFilters.Count);
                 List<List<double>> synthTemplateIDForFilter = new List<List<double>>(distinctFilters.Count);
 
-                //TODO Change this as well if multiple filters will have the same calibration
+                //TODO Change this as well if multiple distinct filters will have the same calibration
                 foreach (Filter filt in distinctFilters)
                 {
                     //synthListForFilter.Add(new List<double>());
@@ -784,7 +1016,9 @@ namespace Jhu.PhotoZ
                 Parallel.For(0, filterLists.Count,
                                 index =>
                                 {
-                                    List<Magnitude> localABMagList = new List<Magnitude>(magnitudeLists[index].Select(x => (new Magnitude(x)).ConvertToMagnitudeSystem(MagnitudeSystem.Type.AB)));
+                                    List<ValueWithErrorConvolveableFromFilterAndSpectrum> localMagFluxList = 
+                                                                            new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(magnitudeFluxLists[index].Select(
+                                                                                x => (ValueWithErrorConvolveableFromFilterAndSpectrum)x.Clone()));
                                     Template templateLocalCopy = spectrumTemplate.CloneLightWeight();
 
                                     if (!ReferenceEquals(redshiftList,null))
@@ -792,27 +1026,49 @@ namespace Jhu.PhotoZ
                                         templateLocalCopy.LockRedshiftAtFixedValue(redshiftList[index]);                                     
                                     }
 
-                                    bool error;
+                                    int error;
                                     Spectrum bestFitSpec = GetBestChiSquareFit( templateLocalCopy, 
                                                                                 filterLists[index],
-                                                                                localABMagList,
+                                                                                localMagFluxList,
                                                                                 fitInFluxSpace,
-                                                                                0.0,
-                                                                                true,
-                                                                                out error);
+                                                                                errorSofteningParameter,
+                                                                                false,
+                                                                                out error,
+                                                                                correlationMatrixList[index],
+                                                                                correlationMatrixAlreadyInverted);
 
-                                    if (!error)
+                                    if (error==0)
                                     {
                                         
                                         Flux synthFlux = new Flux();
 
-                                        for (int i = 0; i < localABMagList.Count; ++i)
+                                        List<ValueWithErrorConvolveableFromFilterAndSpectrum> localCorrectedMagFluxList = SetupABMagOrFluxListWithErrorScaling( 
+                                                                                                                                filterLists[index],
+                                                                                                                                localMagFluxList,
+                                                                                                                                fitInFluxSpace,
+                                                                                                                                errorSofteningParameter,
+                                                                                                                                false);
+
+
+
+                                        for (int i = 0; i < localCorrectedMagFluxList.Count; ++i)
                                         {
                                             synthFlux.ConvolveFromFilterAndSpectrum(bestFitSpec, filterLists[index][i]);
 
-                                            double synthMagValue = synthFlux.ConvertToMagnitude(localABMagList[i].MagSystem).Value;
+                                            double synthMagValue = synthFlux.ConvertToMagnitude(MagnitudeSystem.Type.AB).Value;
 
-                                            Flux measuredFlux = localABMagList[i].ConvertToFlux();
+                                            Flux measuredFlux;
+                                            Magnitude measuredMag;
+                                            if (fitInFluxSpace)
+                                            {
+                                                measuredFlux = (Flux)localCorrectedMagFluxList[i];
+                                                measuredMag = measuredFlux.ConvertToMagnitude(MagnitudeSystem.Type.AB);
+                                            } 
+                                            else 
+                                            {
+                                                measuredMag = (Magnitude)localCorrectedMagFluxList[i];
+                                                measuredFlux = measuredMag.ConvertToFlux();
+                                            }
 
                                             double typeID = templateLocalCopy.GetParameterValue("TypeID");
 
@@ -821,8 +1077,8 @@ namespace Jhu.PhotoZ
                                             lock (filterLockList[currentFilterID])
                                             {
                                                 synthMagListForFilter[currentFilterID].Add(synthMagValue);
-                                                measuredMagListForFilter[currentFilterID].Add(localABMagList[i].Value);
-                                                measuredMagErrorListForFilter[currentFilterID].Add(localABMagList[i].Error);
+                                                measuredMagListForFilter[currentFilterID].Add(measuredMag.Value);
+                                                measuredMagErrorListForFilter[currentFilterID].Add(measuredMag.Error);
                                                 synthFluxListForFilter[currentFilterID].Add(synthFlux.Value);
                                                 measuredFluxListForFilter[currentFilterID].Add(measuredFlux.Value);
                                                 measuredFluxErrorListForFilter[currentFilterID].Add(measuredFlux.Error);
@@ -841,7 +1097,7 @@ namespace Jhu.PhotoZ
                 maxChange=0.0;
                 int filterNumber=0;
 
-                //using (StreamWriter logFile = new StreamWriter("calib_iter" + iterationNumber.ToString("D3") + ".txt"))
+                //using (StreamWriter logFile = new StreamWriter("D:/RBeck_Work/NextGenPhotoZ/PHAT_new/calib/calib_iter" + iterationNumber.ToString("D3") + ".txt"))
                 //{
                     foreach (Filter filt in distinctFilters)
                     {
@@ -851,7 +1107,7 @@ namespace Jhu.PhotoZ
 
                         //logFile.Write(filterNumber.ToString() + '\t');
 
-                        if (true)
+                        if (fitInFluxSpace)
                         {
 
                             if (synthFluxListForFilter[filterID].Count > 0.0)
@@ -867,13 +1123,14 @@ namespace Jhu.PhotoZ
                                     }
                                 }
 
-                                if (fitInFluxSpace && lhs != 0.0)
+                                if (lhs != 0.0)
                                 {
                                     filt.ZeroPointCorrection *= rhs/lhs;
 
                                     //For fluxes, (alpha*f-f)/f = (alpha-1) is a percentage error, it has to be divided by ln(10)/(-2.5) to give a magnitude error
                                     magCorrection = (rhs / lhs - 1) / Math.Log(10) * (-2.5);
                                 }
+
 
                                 double stdev = 0.0;
                                 int stdevcount = 0;
@@ -890,7 +1147,7 @@ namespace Jhu.PhotoZ
                                         }
                                     }
 
-                                    if (fitInFluxSpace && stdevcount > 1)
+                                    if (stdevcount > 1)
                                     {
                                         filt.ZeroPointErrorCalibration = Math.Sqrt(stdev / (stdevcount - 1));
                                     }
@@ -903,7 +1160,7 @@ namespace Jhu.PhotoZ
                             }
 
                         }
-                        if (true)
+                        else
                         {
                             if (synthMagListForFilter[filterID].Count > 0.0)
                             {
@@ -919,12 +1176,13 @@ namespace Jhu.PhotoZ
                                     }
                                 }
 
-                                if (!fitInFluxSpace && lhs != 0.0)
+                                if (lhs != 0.0)
                                 {
                                     filt.ZeroPointCorrection += rhs / lhs;
 
                                     magCorrection = rhs / lhs;
                                 }
+
 
                                 double stdev = 0.0;
                                 int stdevcount = 0;
@@ -941,9 +1199,9 @@ namespace Jhu.PhotoZ
                                         }
                                     }
 
-                                    if (!fitInFluxSpace && stdevcount > 1)
+                                    if (stdevcount > 1)
                                     {
-                                        filt.ZeroPointErrorCalibration = Math.Sqrt(stdev/(stdevcount-1));
+                                        filt.ZeroPointErrorCalibration = Math.Sqrt(stdev / (stdevcount - 1));
                                     }
 
                                 }
@@ -957,7 +1215,7 @@ namespace Jhu.PhotoZ
                             maxChange = Math.Abs(magCorrection);
                         }
 
-                        /*using (StreamWriter outputFile = new StreamWriter("calib_iter" + iterationNumber.ToString("D3") + "_filt" + filterNumber.ToString("D3") + ".txt"))
+                        /*using (StreamWriter outputFile = new StreamWriter("D:/RBeck_Work/NextGenPhotoZ/PHAT_new/calib/calib_iter" + iterationNumber.ToString("D3") + "_filt" + filterNumber.ToString("D3") + ".txt"))
                         {
                             for (int i = 0; i < synthMagListForFilter[filterID].Count; ++i)
                             {
@@ -992,5 +1250,9 @@ namespace Jhu.PhotoZ
         }
 
     }
+
 }
+
+
+
 

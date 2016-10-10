@@ -17,7 +17,7 @@
     <ModelCollation>1033, CI</ModelCollation>
     <DefaultFileStructure>BySchemaAndSchemaType</DefaultFileStructure>
     <DeployToDatabase>True</DeployToDatabase>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetLanguage>CS</TargetLanguage>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <SqlServerVerification>False</SqlServerVerification>
@@ -26,6 +26,7 @@
     <PermissionSet>UNSAFE</PermissionSet>
     <Trustworthy>True</Trustworthy>
     <TargetDatabase>Jhu.PhotoZSQL</TargetDatabase>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <OutputPath>bin\Release\</OutputPath>
@@ -91,9 +92,18 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Core" />
+    <Reference Include="Jhu.SqlServer.Array">
+      <HintPath>..\lib\Jhu.SqlServer.Array.dll</HintPath>
+    </Reference>
+    <Reference Include="Jhu.SqlServer.Array.Parser">
+      <HintPath>..\lib\Jhu.SqlServer.Array.Parser.dll</HintPath>
+    </Reference>
+    <Reference Include="MathNet.Numerics">
+      <HintPath>..\packages\MathNet.Numerics.3.12.0\lib\net40\MathNet.Numerics.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CalculatePhotoZSQL.cs" />
+    <Compile Include="PhotoZSQLDBInterface.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TestMySpline\TestMySpline.csproj">
@@ -118,14 +128,6 @@
       <GenerateSqlClrDdl>True</GenerateSqlClrDdl>
       <SqlPermissionSet>UNSAFE</SqlPermissionSet>
     </ProjectReference>
-    <ProjectReference Include="..\Jhu.HSCPhotoZ\Jhu.HSCPhotoZ.csproj">
-      <Name>Jhu.HSCPhotoZ</Name>
-      <Project>{c6bab99e-c319-4be6-8d34-7cf986eaef79}</Project>
-      <Private>True</Private>
-      <IsModelAware>True</IsModelAware>
-      <GenerateSqlClrDdl>True</GenerateSqlClrDdl>
-      <SqlPermissionSet>UNSAFE</SqlPermissionSet>
-    </ProjectReference>
     <ProjectReference Include="..\Jhu.PhotoZSQLWrapper\Jhu.PhotoZSQL.csproj">
       <Name>Jhu.PhotoZSQL</Name>
       <Project>{fca0f701-12e1-4a65-a960-3d60fd76fffb}</Project>
@@ -137,5 +139,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Jhu.PhotoZSQL.publish.xml" />
+    <None Include="profile.publish.publish.xml" />
   </ItemGroup>
+  <PropertyGroup>
+    <PostBuildEvent>$(SolutionDir)build\$(PlatformName)\$(ConfigurationName)\gwsqlclrutil.exe $(TargetPath) Unrestricted</PostBuildEvent>
+  </PropertyGroup>
 </Project>

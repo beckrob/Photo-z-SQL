@@ -10,7 +10,7 @@ namespace Jhu.PhotoZ
         //This class is very specific, it has to be used with the 71 BPZ templates (HSCFilterPortal.dbo.Templates or TemplatesLogInterp)
         //Also, the filter should be the WFPC2 F814W (ID 265 in HSCFilterPortal, with MJD ~ 53000 as an estimate)
 
-        //The class could be more general by storing which are the redshift and type parameters like the PriorOnTemplate class,
+        //The class could be more general by storing which are the redshift and type parameters like the PriorOnTemplateType class,
         //and by allowing other interpolation versions, but with the present choice of template libraries this is not needed
 
 

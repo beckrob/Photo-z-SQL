@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Jhu.PhotoZ
 {
-    public abstract class ValueWithErrorConvolveableFromFilterAndSpectrum : IValueWithError<double>
+    public abstract class ValueWithErrorConvolveableFromFilterAndSpectrum : IValueWithError<double>,ICloneable
     {
 
         public double Value { get; set; }
@@ -37,6 +37,10 @@ namespace Jhu.PhotoZ
         }
 
         public abstract void SetupFromUncorrectedFlux(double uncorrectedFlux, double filterZeroPoint, bool filterZeroPointInFlux);
+
+        public abstract bool ApplySchlegelExtinctionCorrection(Filter filt, double mapValue, double rVParam);
+
+        public abstract Object Clone();
 
         protected double GetCorrectedFlux(double uncorrectedFlux, double filterZeroPoint, bool filterZeroPointInFlux)
         {

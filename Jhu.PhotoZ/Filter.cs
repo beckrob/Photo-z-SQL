@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Net;
+using System.Globalization;
 
 namespace Jhu.PhotoZ
 {
@@ -24,7 +27,7 @@ namespace Jhu.PhotoZ
         //Stored map factors for given R_V gas parameters
         //Make sure to reset the map factors whenever the filter response curve is modified,
         //or when the reference spectrum is modified
-        private Dictionary<double, double> RVschlegelMapFactorCache;
+        private ConcurrentDictionary<double, double> RVschlegelMapFactorCache;
         private Spectrum referenceSpectrum;
 
         private const double smallMValueToExtrapolate = 0.001;
@@ -39,8 +42,11 @@ namespace Jhu.PhotoZ
 
             set
             {
-                useFitzPatrickExtinction = value;
-                RVschlegelMapFactorCache = null;
+                if (useFitzPatrickExtinction != value)
+                {
+                    useFitzPatrickExtinction = value;
+                    RVschlegelMapFactorCache.Clear();
+                }
             }
         }
 
@@ -59,7 +65,7 @@ namespace Jhu.PhotoZ
         {
             binCenters = null;
             responses = null;
-            RVschlegelMapFactorCache = null;
+            RVschlegelMapFactorCache = new ConcurrentDictionary<double, double>();
             referenceSpectrum = null;
             useFitzPatrickExtinction = true;
             EffectiveWavelength = Constants.missingDouble;
@@ -72,7 +78,7 @@ namespace Jhu.PhotoZ
         {
             binCenters = aBinCenter;
             responses = aResponses;
-            RVschlegelMapFactorCache = null;
+            RVschlegelMapFactorCache = new ConcurrentDictionary<double, double>();
             referenceSpectrum = null;
             useFitzPatrickExtinction = true;
             EffectiveWavelength = aEffectiveWavelength;
@@ -82,11 +88,11 @@ namespace Jhu.PhotoZ
         }
 
         //Filter read in from file, expected to be in angstroms
-        public Filter(string aFilePath)
+        public Filter(string aFilePath, bool aIsURL = false)
         {
             binCenters = null;
             responses = null;
-            RVschlegelMapFactorCache = null;
+            RVschlegelMapFactorCache = new ConcurrentDictionary<double, double>();
             referenceSpectrum = null;
             useFitzPatrickExtinction = true;
             EffectiveWavelength = Constants.missingDouble;
@@ -94,7 +100,9 @@ namespace Jhu.PhotoZ
             ZeroPointCorrectionInFlux = false;
             ZeroPointErrorCalibration = 1.0;
 
-            using (StreamReader reader = new StreamReader(aFilePath))
+            using (WebClient client = new WebClient())
+            using (Stream dataStream = aIsURL ? client.OpenRead(aFilePath) : new FileStream(aFilePath, FileMode.Open, FileAccess.Read))
+            using (StreamReader reader = new StreamReader(dataStream))
             {
                 List<double> lambdaList = new List<double>();
                 List<double> throughputList = new List<double>();
@@ -110,7 +118,8 @@ namespace Jhu.PhotoZ
 
                         //First two coloumns will be parsed into doubles
                         double value1, value2;
-                        if (double.TryParse(fields[0], out value1) && double.TryParse(fields[1], out value2))
+                        if (double.TryParse(fields[0], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out value1) &&
+                            double.TryParse(fields[1], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out value2))
                         {
                             lambdaList.Add(value1);
                             throughputList.Add(value2);
@@ -127,7 +136,12 @@ namespace Jhu.PhotoZ
                     //Make sure that the ordering of the filter is correct
                     Array.Sort(binCenters, responses);
                 }
-            }       
+            }
+
+            if (ReferenceEquals(binCenters, null) || ReferenceEquals(responses, null))
+            {
+                throw new ArgumentException("Could not read filter properly at the specified path", "aFilePath");
+            }
         }
 
         public override string ToString()
@@ -148,7 +162,7 @@ namespace Jhu.PhotoZ
             if (!ReferenceEquals(referenceSpectrum, aRefSpec))
             {
                 referenceSpectrum = aRefSpec;
-                RVschlegelMapFactorCache = null;
+                RVschlegelMapFactorCache.Clear();
             }
         }
 
@@ -158,16 +172,15 @@ namespace Jhu.PhotoZ
             if (!ReferenceEquals(RVschlegelMapFactorCache, null))
             {
 
-                if (RVschlegelMapFactorCache.ContainsKey(rVParam))
+                if (RVschlegelMapFactorCache.TryGetValue(rVParam, out factor))
                 {
-                    factor = RVschlegelMapFactorCache[rVParam];
                     return true;
                 }
                 else
                 {
                     if (ComputeSchlegelMapFactor(rVParam, out factor))
                     {
-                        RVschlegelMapFactorCache[rVParam] = factor;
+                        RVschlegelMapFactorCache.TryAdd(rVParam, factor);
                         return true;
                     }
                     else
@@ -179,16 +192,8 @@ namespace Jhu.PhotoZ
             }
             else
             {
-                if (ComputeSchlegelMapFactor(rVParam, out factor))
-                {
-                    RVschlegelMapFactorCache = new Dictionary<double, double>(1);
-                    RVschlegelMapFactorCache[rVParam] = factor;
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                factor = Constants.missingDouble;
+                return false;
             }
         }
 

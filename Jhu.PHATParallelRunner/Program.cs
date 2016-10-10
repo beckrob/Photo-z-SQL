@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.IO;
@@ -63,13 +62,16 @@ namespace Jhu.PHATParallelRunner
             //  3 - LePhare templates with absolute magnitude prior
             //  4 - LePhare templates with adapted BPZ prior
             //Fourth argument: integer code of whether to do zero-point calibration (0 no, 1 yes, 2 yes, and also apply filter error calibration)
-            //                  0 or 1 will mean an extra 0.01 magnitude error is added, 2 means the calibrated magnitude error is added
+            //Fifth argument: number of galaxies to skip/use for calibration
+            //Sixth argument: amount of extra magnitude error to add
 
             //The output will be on the standard output
 
             int photoSetup;
             int doCalibration;
-            if (args.Length == 4 && int.TryParse(args[2], out photoSetup) && int.TryParse(args[3], out doCalibration))
+            int skippedGalaxyNum;
+            double errorSoftening;
+            if (args.Length == 6 && int.TryParse(args[2], out photoSetup) && int.TryParse(args[3], out doCalibration) && int.TryParse(args[4], out skippedGalaxyNum) && double.TryParse(args[5], out errorSoftening))
             {
 
                 HSCTemplateExtractorDB templateExtractor = new HSCTemplateExtractorDB(aConnectionStringTemplates);
@@ -104,18 +106,7 @@ namespace Jhu.PHATParallelRunner
                     }
                 }
 
-                double errorSoftening;
-                bool applyFilterErrorCorrection;
-                if (doCalibration == 2)
-                {
-                    errorSoftening = 0.0;
-                    applyFilterErrorCorrection = true;
-                }
-                else
-                {
-                    errorSoftening = 0.01;
-                    applyFilterErrorCorrection = false;
-                }
+                bool applyFilterErrorCorrection = (doCalibration == 2);
 
                 TemplateSimpleLibrary templateLib = new TemplateSimpleLibrary(templates, new TemplateParameterAdditive(1e-3, 6.001, 0.01))
                 {
@@ -123,11 +114,16 @@ namespace Jhu.PHATParallelRunner
                     IterationStepsWhenIgnoringLuminosity = 11
                 };
 
+
+                string globalFilePath = (args[0].LastIndexOf('/') < args[0].LastIndexOf('\\'))
+                                            ? args[0].Remove(args[0].LastIndexOf('\\')) + "\\"
+                                            : args[0].Remove(args[0].LastIndexOf('/')) + "/";
+
                 List<Filter> filterList = new List<Filter>(14);
                 for (int i = 0; i < 14; ++i)
                 {
 
-                    Filter tmpFilter = new Filter(aFilterPaths[i]);
+                    Filter tmpFilter = new Filter(globalFilePath+aFilterPaths[i]);
 
                     tmpFilter.EffectiveWavelength = aFilterEffWavelengths[i];
                     tmpFilter.SetReferenceSpectrumForExtinctionCorrection(templates[0]);
@@ -138,7 +134,7 @@ namespace Jhu.PHATParallelRunner
                 }
 
 
-                List<Magnitude> magnitudeList = new List<Magnitude>(14);
+                List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeList = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(14);
                 for (int i = 0; i < 14; ++i)
                 {
                     magnitudeList.Add(new Magnitude() { Value = 21.0, Error = 0.2, MagSystem = MagnitudeSystem.Type.AB });
@@ -147,11 +143,11 @@ namespace Jhu.PHATParallelRunner
 
                 //Populating syntheticFluxCache with cached synthetic magnitude results
                 //Calls from the same filter set will not populate
-                bool dummyFitError;
+                int dummyFitError;
                 TemplateFit.GetBestChiSquareFit(templateLib,
                                                 filterList,
                                                 magnitudeList,
-                                                true,
+                                                false,
                                                 0.0,
                                                 false,
                                                 out dummyFitError);
@@ -166,12 +162,50 @@ namespace Jhu.PHATParallelRunner
                                                 17913.0,22934.0,46470.0,17546.0,2469.0,301.0,
                                                 2862.0,7073.0,4436.0,1948.0};
                 Prior priorInfo = new PriorOnTemplateType(Enumerable.Range(0, 38).ToArray(), typeProbabilites);*/
+                if (photoSetup == 0 || photoSetup == 2)
+                {
+                    priorInfo = new PriorFlat();
+                }
+                if (photoSetup == 1)
+                {
+                    bool error;
+                    HSCFilterExtractorDB priorFilterExtractor = new HSCFilterExtractorDB(aConnectionStringTemplates);
+                    Filter filtI814 = priorFilterExtractor.ExtractFilterFromDB(265, 53000, out error);
+
+                    if (!error)
+                    {
+                        priorInfo = new PriorBenitezHubble(filtI814, templateLib);
+                    }
+                }
+                if (photoSetup == 3)
+                {
+                    bool error;
+                    HSCFilterExtractorDB priorFilterExtractor = new HSCFilterExtractorDB(aConnectionStringTemplates);
+                    Filter filtB = priorFilterExtractor.ExtractFilterFromDB(92, 0, out error);
+
+                    if (!error)
+                    {
+                        priorInfo = new PriorAbsMagLimitInFilter(-24.0, filtB, templateLib);
+                    }
+                }
+                if (photoSetup == 4)
+                {
+                    bool error;
+                    HSCFilterExtractorDB priorFilterExtractor = new HSCFilterExtractorDB(aConnectionStringTemplates);
+                    Filter filtI814 = priorFilterExtractor.ExtractFilterFromDB(265, 53000, out error);
+
+                    if (!error)
+                    {
+                        priorInfo = new PriorBenitezHubbleOnLephare(filtI814, templateLib);
+                    }
+                }
+
 
 
                 int galaxyCount = 0;
                 int taskCount = 0;
 
-                List<List<Magnitude>> calibrationMagnitudeLists = new List<List<Magnitude>>();
+                List<List<ValueWithErrorConvolveableFromFilterAndSpectrum>> calibrationMagnitudeLists = new List<List<ValueWithErrorConvolveableFromFilterAndSpectrum>>();
                 List<List<Filter>> calibrationFilterLists = new List<List<Filter>>();
                 List<double> calibrationRedshiftList = new List<double>();
 
@@ -218,7 +252,7 @@ namespace Jhu.PHATParallelRunner
                                 if (!readError)
                                 {
 
-                                    List<Magnitude> magnitudeLocalCopy = new List<Magnitude>();
+                                    List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeLocalCopy = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>();
                                     List<Filter> filterLocalCopy = new List<Filter>();
 
                                     for (int i = 0; i < 14; ++i)
@@ -226,75 +260,37 @@ namespace Jhu.PHATParallelRunner
                                         if (magnitudeList[i].Value != 99 && magnitudeList[i].Value != -99
                                             && magnitudeList[i].Error != 99 && magnitudeList[i].Error > 0.0)
                                         {
-                                            magnitudeLocalCopy.Add(new Magnitude(magnitudeList[i]));
+                                            magnitudeLocalCopy.Add((ValueWithErrorConvolveableFromFilterAndSpectrum)magnitudeList[i].Clone());
                                             filterLocalCopy.Add(filterList[i]);
                                         }
                                     }
 
                                     double closestRedshift = templateLib.GetClosestParameterValueInCoverage("Redshift", redshift);
 
-                                    int localGalaxyCount = ++galaxyCount;
+                                    ++galaxyCount;
 
 
-                                    if (galaxyCount <= 515)
+                                    if (galaxyCount <= skippedGalaxyNum)
                                     {
                                         if (doCalibration == 1 || doCalibration == 2)
                                         {
 
-                                            calibrationMagnitudeLists.Add(new List<Magnitude>(magnitudeLocalCopy));
+                                            calibrationMagnitudeLists.Add(new List<ValueWithErrorConvolveableFromFilterAndSpectrum>(magnitudeLocalCopy));
                                             calibrationFilterLists.Add(new List<Filter>(filterLocalCopy));
                                             calibrationRedshiftList.Add(closestRedshift);
-                                        }
 
-                                        if (galaxyCount == 515)
-                                        {
-                                            if (doCalibration == 1 || doCalibration == 2)
+
+                                            if (galaxyCount == skippedGalaxyNum)
                                             {
-                                                TemplateFit.CalibrateFilterZeroPoints(0.01,
+
+                                                TemplateFit.CalibrateFilterZeroPoints(0.001,
                                                                                         100,
                                                                                         templateLib,
                                                                                         calibrationFilterLists,
                                                                                         calibrationMagnitudeLists,
                                                                                         calibrationRedshiftList,
-                                                                                        true);
-                                            }
-
-                                            if (photoSetup == 0 || photoSetup == 2)
-                                            {
-                                                priorInfo = new PriorFlat();
-                                            }
-                                            if (photoSetup == 1)
-                                            {
-                                                bool error;
-                                                HSCFilterExtractorDB priorFilterExtractor = new HSCFilterExtractorDB(aConnectionStringTemplates);
-                                                Filter filtI814 = priorFilterExtractor.ExtractFilterFromDB(265, 53000, out error);
-
-                                                if (!error)
-                                                {
-                                                    priorInfo = new PriorBenitezHubble(filtI814, templateLib);
-                                                }
-                                            }
-                                            if (photoSetup == 3)
-                                            {
-                                                bool error;
-                                                HSCFilterExtractorDB priorFilterExtractor = new HSCFilterExtractorDB(aConnectionStringTemplates);
-                                                Filter filtB = priorFilterExtractor.ExtractFilterFromDB(92, 0, out error);
-
-                                                if (!error)
-                                                {
-                                                    priorInfo = new PriorAbsMagLimitInFilter(-24.0, filtB, templateLib);
-                                                }
-                                            }
-                                            if (photoSetup == 4)
-                                            {
-                                                bool error;
-                                                HSCFilterExtractorDB priorFilterExtractor = new HSCFilterExtractorDB(aConnectionStringTemplates);
-                                                Filter filtI814 = priorFilterExtractor.ExtractFilterFromDB(265, 53000, out error);
-
-                                                if (!error)
-                                                {
-                                                    priorInfo = new PriorBenitezHubbleOnLephare(filtI814, templateLib);
-                                                }
+                                                                                        false,
+                                                                                        errorSoftening);
                                             }
 
                                         }
@@ -354,7 +350,7 @@ namespace Jhu.PHATParallelRunner
                                 if (!readError)
                                 {
 
-                                    List<Magnitude> magnitudeLocalCopy = new List<Magnitude>();
+                                    List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeLocalCopy = new List<ValueWithErrorConvolveableFromFilterAndSpectrum>();
                                     List<Filter> filterLocalCopy = new List<Filter>();
                                     List<string> filterStringLocalCopy = new List<string>();
 
@@ -363,17 +359,17 @@ namespace Jhu.PHATParallelRunner
                                         if (magnitudeList[i].Value != 99 && magnitudeList[i].Value != -99
                                             && magnitudeList[i].Error != 99 && magnitudeList[i].Error != -99)
                                         {
-                                            magnitudeLocalCopy.Add(new Magnitude(magnitudeList[i]));
+                                            magnitudeLocalCopy.Add((ValueWithErrorConvolveableFromFilterAndSpectrum)magnitudeList[i].Clone());
                                             filterLocalCopy.Add(filterList[i]);
                                             filterStringLocalCopy.Add(aFilterTags[i]);
                                         }
                                     }
 
-                                    double closestRedshift = templateLib.GetClosestParameterValueInCoverage("Redshift", redshift);
+                                    //double closestRedshift = templateLib.GetClosestParameterValueInCoverage("Redshift", redshift);
 
                                     int localGalaxyCount = ++galaxyCount;
 
-                                    if (galaxyCount <= 515)
+                                    if (galaxyCount > skippedGalaxyNum && galaxyCount <= 515)
                                     {
 
                                         int localTaskCount;
@@ -410,7 +406,7 @@ namespace Jhu.PHATParallelRunner
                                                                                                     args[1],
                                                                                                     redshift,
                                                                                                     matchID,
-                                                                                                    true,
+                                                                                                    false,
                                                                                                     errorSoftening,
                                                                                                     applyFilterErrorCorrection,
                                                                                                     filterStringLocalCopy),
@@ -445,7 +441,7 @@ namespace Jhu.PHATParallelRunner
         }
 
 
-        private static void DoBayesianAnalysisWithOutput(List<Magnitude> magnitudeList,
+        private static void DoBayesianAnalysisWithOutput(List<ValueWithErrorConvolveableFromFilterAndSpectrum> magnitudeList,
                                                              Template templateLib,
                                                              Prior priorInfo,
                                                              List<Filter> filterList,
@@ -461,7 +457,7 @@ namespace Jhu.PHATParallelRunner
                                                              List<string> filterStringList)
         {
             List<double> redshifts, redshiftProbabilities;
-            bool fitError;
+            int fitError;
 
             Spectrum result = TemplateFit.GetBayesianBestTemplateFit(templateLib, priorInfo, filterList, magnitudeList, fitInFluxSpace, errorSoftening, applyFilterErrorCalibration, out redshifts, out redshiftProbabilities, out fitError);
 
@@ -470,13 +466,13 @@ namespace Jhu.PHATParallelRunner
             List<Magnitude> synthMags = new List<Magnitude>(magnitudeList.Count);
 
             double redshiftResult = -9999;
-            if (!fitError)
+            if (fitError==0)
             {
                 redshiftResult = result.Redshift;
 
                 for (int i = 0; i < magnitudeList.Count; ++i)
                 {
-                    synthMags.Add(new Magnitude() { MagSystem = magnitudeList[i].MagSystem });
+                    synthMags.Add(new Magnitude() { MagSystem = ((Magnitude)magnitudeList[i]).MagSystem });
                     synthMags[i].ConvolveFromFilterAndSpectrum(result, filterList[i]);
                 }
 
@@ -503,7 +499,7 @@ namespace Jhu.PHATParallelRunner
                     Console.Out.Write("-9999\t");
                 }
 
-                if (!fitError)
+                if (fitError==0)
                 {
 
                     Console.Out.Write(redshiftResult.ToString() + '\t');
@@ -547,7 +543,7 @@ namespace Jhu.PHATParallelRunner
                     Console.Out.Write(magnitudeList[i].Value.ToString() + '\t');
                     Console.Out.Write(magnitudeList[i].Error.ToString() + '\t');
 
-                    if (!fitError)
+                    if (fitError==0)
                     {
                         Console.Out.Write(synthMags[i].Value.ToString() + '\t');
                     }
@@ -566,7 +562,7 @@ namespace Jhu.PHATParallelRunner
 
             using (StreamWriter outputFile = new StreamWriter(probDistFilePath))
             {
-                if (!fitError)
+                if (fitError==0)
                 {
                     for (int i = 0; i < redshifts.Count; ++i)
                     {
@@ -596,7 +592,7 @@ namespace Jhu.PHATParallelRunner
 
             using (StreamWriter outputFile = new StreamWriter(specFilePath))
             {
-                if (!fitError)
+                if (fitError==0)
                 {
 
                     outputFile.Write("#SpecZ=" + redshift.ToString() + " BestFitPhotoZ=" + redshiftResult.ToString() + " MaxProbPhotoZ=" + maximumProbZ.ToString() + '\n');
@@ -609,7 +605,7 @@ namespace Jhu.PHATParallelRunner
                         if (i < filterList.Count)
                         {
                             Flux synthFlux = synthMags[i].ConvertToFlux();
-                            Flux origFlux = magnitudeList[i].ConvertToFlux();
+                            Flux origFlux = ((Magnitude)magnitudeList[i]).ConvertToFlux();
 
                             outputFile.Write(binCenters[i].ToString() + '\t' + fluxes[i].ToString()
                                                 + '\t' + filterList[i].EffectiveWavelength.ToString()

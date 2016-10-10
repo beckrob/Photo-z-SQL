@@ -19,7 +19,7 @@ namespace Jhu.HSCPhotoZ
         }
 
 
-        public Jhu.PhotoZ.Spectrum ExtractTemplateFromDB(int templateID, int templateSetID, out bool error)
+        public Jhu.PhotoZ.Spectrum ExtractTemplateFromDB(int templateID, int templateSetID, out bool error, bool addPaddingInIR = false)
         {
 
             using (SqlConnection conn = new SqlConnection(connectionString))
@@ -76,7 +76,7 @@ namespace Jhu.HSCPhotoZ
                     if (wavelengths.Length > 0 && wavelengths.Length == fluxes.Length)
                     {
                         error = false;
-                        return new Jhu.PhotoZ.Spectrum(wavelengths, fluxes, redshift, luminosity);
+                        return new Jhu.PhotoZ.Spectrum(wavelengths, fluxes, redshift, luminosity, addPaddingInIR);
                     }
                     else
                     {

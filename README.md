@@ -38,14 +38,14 @@ The installation process of Photo-z-SQL is very similar to that of SQLArray.
 
 4. Now that the database has been prepared, Photo-z-SQL can be installed and removed using the provided scripts. Navigate to Jhu.PhotoZSQL\bin\Release (or Jhu.PhotoZSQL\bin\Debug for the debug version), and execute the Create (install) script:
 
-	<pre><code>sqlcmd -S <i>servername\\instance</i> -E -d <i>databasename</i> -i Jhu.PhotoZSQLDB.Create.sql
+	<pre><code>sqlcmd -S <i>servername\instance</i> -E -d <i>databasename</i> -i Jhu.PhotoZSQLDB.Create.sql
 	</code></pre>
 	
-	The `-E` flag denotes integrated Windows authentication, for SQL Server authentication `-U username -P password` can be used instead.
+	The `-E` flag denotes integrated Windows authentication, for SQL Server authentication `-U `*`username`*`-P `*`password`* can be used instead.
 
 5. The packages and assemblies can be uninstalled similarly with the Drop (uninstall) script:
 
-	<pre><code>sqlcmd -S <i>servername\\instance</i> -E -d <i>databasename</i> -i Jhu.PhotoZSQLDB.Drop.sql
+	<pre><code>sqlcmd -S <i>servername\instance</i> -E -d <i>databasename</i> -i Jhu.PhotoZSQLDB.Drop.sql
 	</code></pre>
 	
 6. Now the Photo-z-SQL functions can be called through the database where they were installed. Note that since Compute is a SQL keyword, square brackets are needed to resolve the schema in the case of Compute functions.

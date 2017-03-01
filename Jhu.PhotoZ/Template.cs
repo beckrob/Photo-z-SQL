@@ -49,7 +49,7 @@ namespace Jhu.PhotoZ
 
         protected void CloneLightWeighValues(Template other)
         {
-            other.parameterList = new List<TemplateParameter>(parameterList.Select(x => (TemplateParameter)x.Clone()));
+            other.parameterList = new List<TemplateParameter>(parameterList.Select(x => (TemplateParameter)x.CloneForIteration()));
 
             other.IgnoreLuminosity = IgnoreLuminosity;
             other.IterationStepsWhenIgnoringLuminosity = IterationStepsWhenIgnoringLuminosity;

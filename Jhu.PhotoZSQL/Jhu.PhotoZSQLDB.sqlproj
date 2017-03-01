@@ -140,6 +140,10 @@
   <ItemGroup>
     <None Include="Jhu.PhotoZSQL.publish.xml" />
     <None Include="profile.publish.publish.xml" />
+    <None Include="Test_Setup.sql" />
+    <None Include="Test_ChiSqr.sql" />
+    <None Include="Test_Bayes.sql" />
+    <None Include="Jhu.PhotoZSQLDB.publish.xml" />
   </ItemGroup>
   <PropertyGroup>
     <PostBuildEvent>$(SolutionDir)build\$(PlatformName)\$(ConfigurationName)\gwsqlclrutil.exe $(TargetPath) Unrestricted</PostBuildEvent>

@@ -140,17 +140,19 @@ namespace Jhu.PHATParallelRunner
                     magnitudeList.Add(new Magnitude() { Value = 21.0, Error = 0.2, MagSystem = MagnitudeSystem.Type.AB });
                 }
 
+                Console.Error.WriteLine("Starting at: " + DateTime.Now.ToString("HH:mm:ss.fff"));
+
 
                 //Populating syntheticFluxCache with cached synthetic magnitude results
                 //Calls from the same filter set will not populate
-                int dummyFitError;
+                /*int dummyFitError;
                 TemplateFit.GetBestChiSquareFit(templateLib,
                                                 filterList,
                                                 magnitudeList,
                                                 false,
                                                 0.0,
                                                 false,
-                                                out dummyFitError);
+                                                out dummyFitError);*/
 
 
                 Prior priorInfo = null;
@@ -437,6 +439,8 @@ namespace Jhu.PHATParallelRunner
                     }
 
                 } while (localTaskCount2 > 0);
+
+                Console.Error.WriteLine("Finished at: " + DateTime.Now.ToString("HH:mm:ss.fff"));
             }
         }
 

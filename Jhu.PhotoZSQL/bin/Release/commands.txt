@@ -1,0 +1,4 @@
+sqlcmd -Sfuture1 -E -d PhotoZSQL -i Jhu.PhotoZSQLDB.Drop.sql
+
+sqlcmd -Sfuture1 -E -d PhotoZSQL -i Jhu.PhotoZSQLDB.Create.sql
+

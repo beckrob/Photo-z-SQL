@@ -1,4 +1,44 @@
 
+IF (OBJECT_ID('Util.ParseDoubleArray1D') IS NOT NULL)
+BEGIN
+    DROP FUNCTION [Util].[ParseDoubleArray1D]
+END
+
+GO
+
+
+IF (OBJECT_ID('Util.ParseDoubleArray1DInvariant') IS NOT NULL)
+BEGIN
+    DROP FUNCTION [Util].[ParseDoubleArray1DInvariant]
+END
+
+GO
+
+
+IF (OBJECT_ID('Util.ParseIntArray1D') IS NOT NULL)
+BEGIN
+    DROP FUNCTION [Util].[ParseIntArray1D]
+END
+
+GO
+
+
+IF (OBJECT_ID('Util.ParseIntArray1DInvariant') IS NOT NULL)
+BEGIN
+    DROP FUNCTION [Util].[ParseIntArray1DInvariant]
+END
+
+GO
+
+
+IF (OBJECT_ID('Util.GetTotalCLRMemoryUsage') IS NOT NULL)
+BEGIN
+    DROP FUNCTION [Util].[GetTotalCLRMemoryUsage]
+END
+
+GO
+
+
 IF (OBJECT_ID('Config.SetupTemplateList_URL') IS NOT NULL)
 BEGIN
     DROP FUNCTION [Config].[SetupTemplateList_URL]
@@ -164,16 +204,6 @@ DROP ASSEMBLY [Jhu.PhotoZSQLDB]
 GO
 
 
-DROP ASSEMBLY [Jhu.SqlServer.Array]
-
-GO
-
-
-DROP ASSEMBLY [Jhu.SqlServer.Array.Parser]
-
-GO
-
-
 DROP ASSEMBLY [Jhu.PhotoZSQL]
 
 GO
@@ -210,6 +240,21 @@ GO
 
 
 DROP ASSEMBLY [TestMySpline]
+
+GO
+
+
+DROP ASSEMBLY [Jhu.SqlServer.Array]
+
+GO
+
+
+DROP ASSEMBLY [Jhu.SqlServer.Array.Parser]
+
+GO
+
+
+DROP SCHEMA [Util]
 
 GO
 

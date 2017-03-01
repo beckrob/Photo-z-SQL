@@ -1,0 +1,35 @@
+Debugging and profiling SQL CLR function calls running in a local SQL Server from Visual Studio 2013
+
+To debug:
+
+- Start the SQL server service (sqlservr.exe) on your local machine (from e.g. SQL Server Configuration Manager), note the Process ID (PID) of the service.
+
+- In Visual Studio, compile the solution, and Publish the SQL CLR Project to the database.
+
+- Go to SQL Server Object Explorer/SQL Server, click Add SQL Server, connect to the server. Right click on the given server, tick Allow SQL/CLR Debugging.
+
+- Add a non-build, non-deployment SQL user script to the project - this contains the function calls that should be tested.
+
+- Go to the SQL CLR project Properties/Debug, select Edit under Target Connection String, specify database server and starting database (also test connection), set the previously created user script as the Startup Script.
+
+- Start debugging (F5), attach SQL service process if prompted (this happens when auto-attach fails). Important: this step requires Visual Studio to be run with Administrator privileges!
+
+- Hope that all the symbols are correctly loaded - this might require a second run attempt. Test by stepping into the functions. Important: the interface functions on the SQL/CLR boundary (the ones with the SqlFunction attribute) will not show up when debugging, only the more internal layers of functions.
+
+- You can also add other, non-startup SQL user scripts, connect to the database from the top bar above the script, and execute the script with the debugger (Alt-F5). (Again: admin privileges are needed to attach.)
+
+
+To profile:
+
+- With the debugging set up and working, go to Analyze/Profiler/New performance session.
+
+- Go to Performance Explorer, right click on the new session, go to Properties/General, note the Report location folder - this is the default location the Profiler uses, usually it is the solution directory.
+
+- Copy the compiled dll/pdb files to the default report folder/solution directory. This is important, otherwise the Profiler will not find the Symbols of your project! Also, in my attempts the Profiler could not find the symbols in either the new or the old report directory when I moved the Report location elsewhere, so tampering with that does not seem viable.
+
+- If you also want to see system symbols, you will need the Microsoft pdb files. Go to Tools/Options/Debugging/Symbols, tick Microsoft Symbols Server, optionally add a cache directory for faster loading.
+
+- Go to Analyze/Profiler/Attach, tick Show processes from all users/in all sessions, find the sqlservr.exe process with the appropriate PID, then Attach. (Again: admin privileges are needed to attach.)
+
+- This will start up a Profiler tab that shows that it is profiling. Run the SQL script you need to test (you can execute both with or without the debugger). When done, click Stop profiling. Note that this will most likely stop the SQL server service, so it has to be restarted, and it will get a new PID. Look at the Output window, confirm that all symbols have been loaded, and finally you can analyze the performance report.
+

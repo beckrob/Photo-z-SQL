@@ -193,11 +193,6 @@ namespace Jhu.PhotoZ
 
         }
 
-        public Spectrum(string aSpectrumServiceURL, double aCGSmultiplier = 1.0)
-        {
-
-        }
-
 
         private void AddIRPadding()
         {

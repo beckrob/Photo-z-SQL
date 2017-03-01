@@ -42,6 +42,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jhu.COINParallelRunner", "J
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jhu.WrapperTester", "Jhu.WrapperTester\Jhu.WrapperTester.csproj", "{5645CFDF-D134-4F9B-A761-B517956E4701}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{710313BA-C948-4DFA-8F08-DFF8F3B38E16}"
+	ProjectSection(SolutionItems) = preProject
+		Performance1.psess = Performance1.psess
+		Performance4.psess = Performance4.psess
+		Performance5.psess = Performance5.psess
+		Performance6.psess = Performance6.psess
+		Performance7.psess = Performance7.psess
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -262,6 +271,9 @@ Global
 		{A118713E-0D1D-4E27-B9BD-04EB02EC172C} = {02219783-F931-4945-A881-CEB64543D089}
 		{555B5A3C-E1BF-45C9-B0AD-F7DCAD665209} = {02219783-F931-4945-A881-CEB64543D089}
 		{5645CFDF-D134-4F9B-A761-B517956E4701} = {02219783-F931-4945-A881-CEB64543D089}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 	GlobalSection(TestCaseManagementSettings) = postSolution
 		CategoryFile = Spectrum.vsmdi

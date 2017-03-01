@@ -93,6 +93,7 @@
     <Compile Include="PriorAbsMagLimitInFilter.cs" />
     <Compile Include="PriorBenitezHubbleOnLephare.cs" />
     <Compile Include="PriorOnFluxInFilter.cs" />
+    <Compile Include="TemplateParameterAdditiveRandomIterator.cs" />
     <Compile Include="ValueWithErrorConvolveableFromFilterAndSpectrum.cs" />
     <Compile Include="IValueWithError.cs" />
     <Compile Include="Magnitude.cs" />

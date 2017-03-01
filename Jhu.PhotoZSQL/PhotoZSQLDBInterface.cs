@@ -11,13 +11,119 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.SqlServer.Server;
 using Jhu.SqlServer.Array;
+using System.Globalization;
+
 
 using Jhu.PhotoZ;
 
 public partial class UserDefinedFunctions
 {
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
+                                            SystemDataAccess = SystemDataAccessKind.None,
+                                            IsPrecise = true,
+                                            IsDeterministic = true,
+                                            Name = "Util.ParseDoubleArray1D")]
+    public static SqlBytes ParseDoubleArray1D([SqlFacet(IsFixedLength = false, IsNullable = true, MaxSize = -1)] SqlString doubleListAsStr)
+    {
+        string[] separatedDoubleListAsStr = ((string)doubleListAsStr).Split((CultureInfo.CurrentCulture.TextInfo.ListSeparator+"[]").ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+
+        SqlFloatArrayMax arr = new SqlFloatArrayMax(separatedDoubleListAsStr.Length);
+
+        for (int i=0; i<separatedDoubleListAsStr.Length; ++i)
+        {
+            double tmp;
+            if (double.TryParse(separatedDoubleListAsStr[i], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out tmp))
+            {
+                arr[i]=tmp;
+            }      
+        }
+
+        return arr.ToSqlBuffer();
+    }
+
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
+                                            SystemDataAccess = SystemDataAccessKind.None,
+                                            IsPrecise = true,
+                                            IsDeterministic = true,
+                                            Name = "Util.ParseDoubleArray1DInvariant")]
+    public static SqlBytes ParseDoubleArray1DInvariant([SqlFacet(IsFixedLength = false, IsNullable = true, MaxSize = -1)] SqlString doubleListAsStr)
+    {
+        string[] separatedDoubleListAsStr = ((string)doubleListAsStr).Split((CultureInfo.InvariantCulture.TextInfo.ListSeparator + "[]").ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+
+        SqlFloatArrayMax arr = new SqlFloatArrayMax(separatedDoubleListAsStr.Length);
+
+        for (int i = 0; i < separatedDoubleListAsStr.Length; ++i)
+        {
+            double tmp;
+            if (double.TryParse(separatedDoubleListAsStr[i], NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out tmp))
+            {
+                arr[i] = tmp;
+            }
+        }
+
+        return arr.ToSqlBuffer();
+    }
+
+
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
+                                            SystemDataAccess = SystemDataAccessKind.None,
+                                            IsPrecise = true,
+                                            IsDeterministic = true,
+                                            Name = "Util.ParseIntArray1D")]
+    public static SqlBytes ParseIntArray1D([SqlFacet(IsFixedLength = false, IsNullable = true, MaxSize = -1)] SqlString intListAsStr)
+    {
+        string[] separatedIntListAsStr = ((string)intListAsStr).Split((CultureInfo.CurrentCulture.TextInfo.ListSeparator + "[]").ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+
+        SqlIntArrayMax arr = new SqlIntArrayMax(separatedIntListAsStr.Length);
+
+        for (int i = 0; i < separatedIntListAsStr.Length; ++i)
+        {
+            int tmp;
+            if (int.TryParse(separatedIntListAsStr[i], NumberStyles.Integer, CultureInfo.CurrentCulture, out tmp))
+            {
+                arr[i] = tmp;
+            }
+        }
+
+        return arr.ToSqlBuffer();
+    }
+
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
+                                            SystemDataAccess = SystemDataAccessKind.None,
+                                            IsPrecise = true,
+                                            IsDeterministic = true,
+                                            Name = "Util.ParseIntArray1DInvariant")]
+    public static SqlBytes ParseIntArray1DInvariant([SqlFacet(IsFixedLength = false, IsNullable = true, MaxSize = -1)] SqlString intListAsStr)
+    {
+        string[] separatedIntListAsStr = ((string)intListAsStr).Split((CultureInfo.InvariantCulture.TextInfo.ListSeparator + "[]").ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+
+        SqlIntArrayMax arr = new SqlIntArrayMax(separatedIntListAsStr.Length);
+
+        for (int i = 0; i < separatedIntListAsStr.Length; ++i)
+        {
+            int tmp;
+            if (int.TryParse(separatedIntListAsStr[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out tmp))
+            {
+                arr[i] = tmp;
+            }
+        }
+
+        return arr.ToSqlBuffer();
+    }
+
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
+                                            SystemDataAccess = SystemDataAccessKind.None,
+                                            IsPrecise = true,
+                                            IsDeterministic = false,
+                                            Name = "Util.GetTotalCLRMemoryUsage")]
+    public static SqlInt64 GetTotalCLRMemoryUsage()
+    {
+        return (SqlInt64)GC.GetTotalMemory(true);
+    }
+
+
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -51,7 +157,7 @@ public partial class UserDefinedFunctions
         return retCode;
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -86,7 +192,7 @@ public partial class UserDefinedFunctions
         return retCode;
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -127,7 +233,7 @@ public partial class UserDefinedFunctions
         return retCode;
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -170,7 +276,7 @@ public partial class UserDefinedFunctions
     }
 
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -194,7 +300,7 @@ public partial class UserDefinedFunctions
         return retCode;
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -272,7 +378,7 @@ public partial class UserDefinedFunctions
         return 0;
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -301,7 +407,7 @@ public partial class UserDefinedFunctions
         return retCode;
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -332,7 +438,7 @@ public partial class UserDefinedFunctions
     }
 
     //Reference filter for this prior was originally: WFPC2 F814W
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -356,7 +462,7 @@ public partial class UserDefinedFunctions
     }
 
     //Reference filter for this prior was originally: WFPC2 F814W
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = true,
                                             IsDeterministic = false,
@@ -422,7 +528,7 @@ public partial class UserDefinedFunctions
         Probability = (SqlDouble)valuePair.Item2;
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess=DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess=SystemDataAccessKind.None,
                                             IsPrecise=false,
                                             IsDeterministic=false,
@@ -478,7 +584,7 @@ public partial class UserDefinedFunctions
         }
     }
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = false,
                                             IsDeterministic = false,
@@ -535,7 +641,7 @@ public partial class UserDefinedFunctions
     }
 
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = false,
                                             IsDeterministic = false,
@@ -586,7 +692,7 @@ public partial class UserDefinedFunctions
     }
 
 
-    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.Read,
+    [Microsoft.SqlServer.Server.SqlFunction(DataAccess = DataAccessKind.None,
                                             SystemDataAccess = SystemDataAccessKind.None,
                                             IsPrecise = false,
                                             IsDeterministic = false,

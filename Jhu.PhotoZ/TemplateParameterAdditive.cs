@@ -7,7 +7,7 @@ namespace Jhu.PhotoZ
 {
     public class TemplateParameterAdditive : TemplateParameter
     {
-        private double paramStart, paramEnd, paramStepSize;
+        protected double paramStart, paramEnd, paramStepSize;
 
 
         public TemplateParameterAdditive()

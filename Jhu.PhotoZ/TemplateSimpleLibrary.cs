@@ -20,8 +20,8 @@ namespace Jhu.PhotoZ
             {
                 templateList = new List<Spectrum>();
             }
-            parameterList.Add(new TemplateParameterAdditive(0, templateList.Count-1, 1) { Name = "TypeID", Value = 0 });
-           
+            parameterList.Add(new TemplateParameterAdditiveRandomIterator(0, templateList.Count - 1, 1) { Name = "TypeID" });
+            //parameterList.Add(new TemplateParameterAdditive(0, templateList.Count - 1, 1) { Name = "TypeID", Value = 0});
         }
 
         protected TemplateSimpleLibrary() {}
@@ -50,25 +50,28 @@ namespace Jhu.PhotoZ
         public void AddTemplateSpectrum(Spectrum aTemplate)
         { 
             templateList.Add(aTemplate);
-            double val = parameterList[2].Value;
-            parameterList[2] = new TemplateParameterAdditive(0, templateList.Count-1, 1) { Name = "TypeID", Value = val };
+            parameterList[2] = new TemplateParameterAdditiveRandomIterator(0, templateList.Count - 1, 1) { Name = "TypeID" };
+            //double val = parameterList[2].Value;
+            //parameterList[2] = new TemplateParameterAdditive(0, templateList.Count - 1, 1) { Name = "TypeID", Value = val };
         }
 
         public void RemoveTemplateSpectrum(int atemplateID)
         {
             templateList.RemoveAt(atemplateID);
-            double val=parameterList[2].Value;
+            parameterList[2] = new TemplateParameterAdditiveRandomIterator(0, templateList.Count - 1, 1) { Name = "TypeID" };
+            /*double val=parameterList[2].Value;
             if (val >= atemplateID && val > 0)
             {
                 --val;
             }
-            parameterList[2] = new TemplateParameterAdditive(0, templateList.Count-1, 1) { Name = "TypeID", Value = val };
+            parameterList[2] = new TemplateParameterAdditive(0, templateList.Count - 1, 1) { Name = "TypeID", Value = val };*/
         }
 
         public void RemoveAllTemplateSpectra()
         {
             templateList.Clear();
-            parameterList[2] = new TemplateParameterAdditive(0, templateList.Count-1, 1) { Name = "TypeID", Value = 0 };
+            parameterList[2] = new TemplateParameterAdditiveRandomIterator(0, templateList.Count - 1, 1) { Name = "TypeID" };
+            //parameterList[2] = new TemplateParameterAdditive(0, templateList.Count - 1, 1) { Name = "TypeID", Value = 0 };
         }
 
         public override Spectrum GenerateSpectrum()

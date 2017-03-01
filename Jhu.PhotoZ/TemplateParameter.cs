@@ -49,6 +49,11 @@ namespace Jhu.PhotoZ
 
         public abstract Object Clone();
 
+        public virtual Object CloneForIteration()
+        {
+            return this.Clone();
+        }
+
 
         public abstract void ResetValue();
         public abstract bool StepValue();

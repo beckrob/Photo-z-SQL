@@ -32,7 +32,7 @@ The installation process of Photo-z-SQL is very similar to that of SQLArray.
 3. Since the Photo-z-SQL assemblies require unrestricted access, the database will need to be set to trustworthy using the commands below. (Alternatively, an RSA key could be used, see the SQLArray documentation.)
 	
 	```
-	ALTER DATABASE *databasename*
+	ALTER DATABASE <i>databasename</i>
 	SET TRUSTWORTHY ON
 	GO
 	```
@@ -40,21 +40,21 @@ The installation process of Photo-z-SQL is very similar to that of SQLArray.
 4. Now that the database has been prepared, Photo-z-SQL can be installed and removed using the provided scripts. Navigate to Jhu.PhotoZSQL\bin\Release (or Jhu.PhotoZSQL\bin\Debug for the debug version), and execute the Create (install) script:
 
 	```
-	sqlcmd -S *servername* -E -d *databasename* -i Jhu.PhotoZSQLDB.Create.sql
+	sqlcmd -S <i>servername</i> -E -d <i>databasename</i> -i Jhu.PhotoZSQLDB.Create.sql
 	```
 	
 5. The packages and assemblies can be uninstalled similarly with the Drop (uninstall) script:
 
 	```
-	sqlcmd -S *servername* -E -d *databasename* -i Jhu.PhotoZSQLDB.Drop.sql
+	sqlcmd -S <i>servername</i> -E -d <i>databasename</i> -i Jhu.PhotoZSQLDB.Drop.sql
 	```
 	
 6. Now the Photo-z-SQL functions can be called through the database where they were installed. Note that since Compute is a SQL keyword, square brackets are needed to resolve the schema in the case of Compute functions.
 
 	```
-	SELECT *databasename*.Config.RemoveInitialization()
+	SELECT <i>databasename</i>.Config.RemoveInitialization()
 	...
-	SELECT *databasename*.[Compute].PhotoZMinChiSqr_ID(...)
+	SELECT <i>databasename</i>.[Compute].PhotoZMinChiSqr_ID(...)
 	```
 
 ##Function description

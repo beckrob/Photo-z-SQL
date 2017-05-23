@@ -1,10 +1,10 @@
-#Photo-z-SQL
+# Photo-z-SQL
 
 Photo-z-SQL is a database-integrated, template-based photometric redshift estimation software package, written in C\#. Details are presented in the following paper: [https://arxiv.org/abs/1611.01560].
 
-Comments, questions and requests about features/bugs/etc. should be sent to the lead author.
+Comments, questions and requests about features/bugs/etc. should be sent to the lead author, Robert Beck.
 
-##Installation instructions
+## Installation instructions
 
 First, it is highly recommended to install the most recent version of SQLArray to your database server, from https://github.com/idies/sqlarray. Debug and Release packages are bundled in the Install directory, alongside a pdf with instructions.
 
@@ -55,9 +55,9 @@ The installation process of Photo-z-SQL is very similar to that of SQLArray.
 	SELECT <i>databasename</i>.[Compute].PhotoZMinChiSqr_ID(...)
 	</code></pre>
 
-##Function description
+## Function description
 
-###Config functions
+### Config functions
 
 * Config.AddMissingValueSpecifier - Specifies a value that denotes missing or otherwise invalid inputs. All such inputs are ignored.
 	* Float, @aMissingValue - the value that should be ignored.
@@ -167,7 +167,7 @@ The installation process of Photo-z-SQL is very similar to that of SQLArray.
 	* Varbinary(max), @templateProbabilities - a list of float probabilities in a SQLArray FloatArrayMax object.
 	* Returns int, 0 if successful, or a negative error code.
 
-###Compute functions
+### Compute functions
 
 * [Compute].PhotoZMinChiSqr_ID - Perform a minimum chi-square photo-z fit to the given flux or magnitude data. Corresponding photometric filters are specified with VO Filter Profile Services IDs.
 	* Varbinary(max), @magOrFluxArray - a list of fluxes or magnitudes in a SQLArray FloatArrayMax object.
@@ -210,7 +210,7 @@ The installation process of Photo-z-SQL is very similar to that of SQLArray.
 	* Returns a table with two columns, Redshift (float), a given point of the redshift grid, and Probability (float), the corresponding normalized probability. Upon failure, a (negative error code, 0) row is returned.
 
 	
-###Util functions	
+### Util functions	
 	
 * Util.GetTotalCLRMemoryUsage - Gets the total amount of currently allocated CLR memory in the server.
 	* No parameters.
@@ -232,8 +232,12 @@ The installation process of Photo-z-SQL is very similar to that of SQLArray.
 	* Nvarchar(max), @intListAsStr - the string containing the integers, with a format following '[1,2,3]', using invariant culture settings.
 	* Returns varbinary(max), the parsed SQLArray IntArrayMax object.		
 	
-##SQLArray note
+## SQLArray note
 
 SQLArray contains built-in functions for efficiently creating 1D arrays between length *N*=1 and *N*=10 from numerical variables (e.g. SqlArray.FloatArrayMax.Vector_*N*(...) or SqlArray.IntArrayMax.Vector_*N*(...)). However, for arrays longer than that, the Parse functions are needed, which are rather general, but highly inefficient in the case of 1D arrays.
 
 For this reason, when more than 10 elements are needed in an array, Photo-z-SQL users are encouraged to use the Util functions we provide for interfacing between Photo-z-SQL and SQLArray.
+
+## Acknowledgements
+
+The realization of this work was supported by the Hungarian NKFI NN grant 114560. Robert Beck was supported through the New National Excellence Program of the Ministry of Human Capacities, Hungary.
